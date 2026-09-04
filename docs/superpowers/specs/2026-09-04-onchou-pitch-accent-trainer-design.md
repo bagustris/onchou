@@ -25,14 +25,16 @@ worker), that:
 
 1. Shows a word, its reading, and its correct pitch-accent pattern as a
    dot-and-line diagram (reusing the existing convention from jlpt/kotoba).
-2. Records the learner saying the word via the microphone.
-3. Extracts an F0 contour from the recording, segments it per mora, and
+2. Lets the learner hear a reference pronunciation via the browser's built-in
+   Japanese TTS voice, so they have something to imitate before recording.
+3. Records the learner saying the word via the microphone.
+4. Extracts an F0 contour from the recording, segments it per mora, and
    reduces it to the same H/L representation as the target pattern.
-4. Renders the learner's detected pattern with the same diagram renderer,
+5. Renders the learner's detected pattern with the same diagram renderer,
    side by side with the target, and shows per-mora agreement.
 
 Non-goals for v1: segmental (consonant/vowel) accuracy scoring, sentence-level
-practice, reference audio playback (TTS), and any cloud/model dependency.
+practice, and any cloud/model/server dependency.
 
 ## Data
 
@@ -91,6 +93,24 @@ detected `H`/`L` array (the learner's attempt), in a different CSS color
 (`--accent` for target, a new `--accent-learner` token for the recording) so
 the two are visually distinguishable when shown together.
 
+## Reference audio (TTS)
+
+`js/reference-audio.js` wraps `window.speechSynthesis`: on "Play", speaks the
+word's reading with a `ja-JP` voice (picked via `speechSynthesis.getVoices()`
+filtered to `lang.startsWith('ja')`, same voice-selection approach
+`ai-pronunciation-trainer`'s offline-first mode uses). No server-side
+fallback (unlike `ai-pronunciation-trainer`'s sherox fallback) — staying
+serverless is a hard requirement for this app, so a missing/absent Japanese
+voice on the learner's system means "Play" is disabled with an inline note,
+not a silent failure.
+
+Known trade-off, accepted for v1: most competent Japanese TTS voices derive
+prosody from an internal accent dictionary and get common words right, but
+occasionally a lightweight/local voice will sound flat or wrong on rarer
+words. The pitch-accent diagram (from `accentNum`, Kanjium-sourced) remains
+the authoritative target the learner is scored against — TTS audio is a
+listening aid, not the ground truth.
+
 ## Recording & pitch-detection pipeline (the new part)
 
 ### `js/pitch-detect.js`
@@ -132,17 +152,24 @@ opaque percentage.
 
 ## UI flow
 
-1. Word card: kanji/kana word + reading + target pitch diagram.
+1. Word card: kanji/kana word + reading + target pitch diagram + "▶ Play"
+   button (TTS reference, disabled with an inline note if no Japanese voice
+   is available).
 2. "Record" button → mic permission prompt (first time) → recording state
    (visual indicator, e.g. pulsing dot) → learner taps "Stop" (or a max
    duration auto-stop, e.g. 3s, to bound memory/processing).
 3. On stop: run `pitch-detect` + `mora-segment` → render learner's diagram
    directly under the target diagram → per-mora match/mismatch/unclear
    highlighting → "N of M matched" text.
-4. "Next word" advances; "Retry" re-records the same word.
+4. "Next word" advances; "Retry" re-records the same word. "▶ Play" remains
+   available at every step to re-listen.
 
 ## Error handling
 
+- No `ja-JP` (or `ja-*`) voice available via `speechSynthesis.getVoices()` →
+  "▶ Play" is disabled with an inline note ("no Japanese voice found on this
+  device/browser") rather than speaking in the wrong language or silently
+  no-op'ing. The pitch diagram remains the primary reference regardless.
 - Mic permission denied → inline message ("Microphone access is needed to
   practice pronunciation — allow it and try again"), card stays otherwise
   usable (diagram still visible).
