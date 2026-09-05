@@ -266,6 +266,28 @@ button {
   stroke: none;
 }
 
+/* Raw pitch-curve graph (js/pitch-contour.js): the learner's actual F0
+   trace as a continuous line, alongside a stylized step-line for the
+   target H/L pattern -- shown below the existing dot-and-line diagrams
+   above, not replacing them. Reuses the same --accent (target)/
+   --accent-learner (learner) tokens as the dot diagrams so the two views
+   read as the same target/learner color pairing throughout the card. */
+.contour-plot {
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.contour-line-target {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.contour-line-learner {
+  stroke: var(--accent-learner);
+  stroke-width: 1.5;
+}
+
 /* Recording-in-progress indicator: a small pulsing dot, placed next to the
    Record/Stop button while a recording is active. Uses existing tokens
    only (--accent for the dot color). Toggled via [hidden] around

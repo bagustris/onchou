@@ -20,7 +20,18 @@
     return sorted[mid];
   }
 
-  // segmentByMora(trace, moraCount) -> { pattern: ['H'|'L'|'unclear', ...] }
+  // segmentByMora(trace, moraCount) -> {
+  //   pattern: ['H'|'L'|'unclear', ...],
+  //   spanStart, spanEnd: the voiced span's tMs bounds (both null if no
+  //     voiced frames at all) -- exposed so js/pitch-contour.js's target
+  //     step-line can divide the SAME span into the SAME per-mora slots
+  //     this function actually scored against, rather than guessing an
+  //     independent timing.
+  //   overallMedian: the voiced-frame median Hz used for H/L conversion
+  //     below (null if no voiced frames) -- exposed so js/pitch-contour.js
+  //     can normalize the learner's raw trace against the same reference
+  //     point the H/L pattern was judged against.
+  // }
   //
   // trace: [{tMs, hz|null}, ...] -- raw pitch-detect output, in time order.
   // moraCount: plain number, supplied by the caller (PitchDiagram.moraSplit
@@ -42,7 +53,7 @@
     if (!voiced.length) {
       var pattern = [];
       for (var i = 0; i < moraCount; i++) pattern.push('unclear');
-      return { pattern: pattern };
+      return { pattern: pattern, spanStart: null, spanEnd: null, overallMedian: null };
     }
 
     var spanStart = voiced[0].tMs;
@@ -82,7 +93,7 @@
       return m >= overallMedian ? 'H' : 'L';
     });
 
-    return { pattern: result };
+    return { pattern: result, spanStart: spanStart, spanEnd: spanEnd, overallMedian: overallMedian };
   }
 
   // scorePattern(learnerPattern, targetPattern) ->

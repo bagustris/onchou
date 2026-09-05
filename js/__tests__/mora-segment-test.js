@@ -138,5 +138,30 @@ function eq(desc, got, expected) {
   }
 }
 
+// -- segmentByMora also returns spanStart/spanEnd/overallMedian, for
+// js/pitch-contour.js's target step-line to align to the exact same
+// time-slots this function actually scored against -----------------------
+
+{
+  const trace = [
+    { tMs: 5, hz: 100 }, { tMs: 45, hz: 200 }, { tMs: 95, hz: 150 },
+  ];
+  const result = segmentByMora(trace, 3);
+  eq('spanStart is the first voiced frame\'s tMs', result.spanStart, 5);
+  eq('spanEnd is the last voiced frame\'s tMs', result.spanEnd, 95);
+  eq('overallMedian is the median of all voiced Hz', result.overallMedian, 150);
+}
+
+{
+  // All-unvoiced: no span, no median -- both null rather than throwing or
+  // fabricating a value, matching the all-unclear pattern this case already
+  // produces.
+  const trace = [{ tMs: 0, hz: null }, { tMs: 20, hz: null }];
+  const result = segmentByMora(trace, 2);
+  eq('all-unvoiced trace: spanStart is null', result.spanStart, null);
+  eq('all-unvoiced trace: spanEnd is null', result.spanEnd, null);
+  eq('all-unvoiced trace: overallMedian is null', result.overallMedian, null);
+}
+
 console.log(`mora-segment-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

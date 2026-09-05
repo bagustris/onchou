@@ -16,6 +16,8 @@
     playBtnNote: document.getElementById('play-btn-note'),
     learnerDiagramRow: document.getElementById('learner-diagram-row'),
     learnerDiagram: document.getElementById('learner-diagram'),
+    contourRow: document.getElementById('contour-row'),
+    contourGraph: document.getElementById('contour-graph'),
     moraFeedback: document.getElementById('mora-feedback'),
     scoreText: document.getElementById('score-text'),
     detectMessage: document.getElementById('detect-message'),
@@ -64,6 +66,8 @@
   function resetAttemptUI() {
     els.learnerDiagramRow.hidden = true;
     els.learnerDiagram.innerHTML = '';
+    els.contourRow.hidden = true;
+    els.contourGraph.innerHTML = '';
     els.moraFeedback.hidden = true;
     els.moraFeedback.innerHTML = '';
     els.scoreText.hidden = true;
@@ -182,6 +186,9 @@
       variant: 'learner',
       trailing: false,
     });
+
+    els.contourRow.hidden = false;
+    els.contourGraph.innerHTML = PitchContour.renderSVG(trace, targetLevelsFor(word), segmented);
 
     els.moraFeedback.hidden = false;
     els.moraFeedback.innerHTML = score.perMora.map(function (status, i) {

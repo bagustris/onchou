@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'onchou-v6';
+const CACHE_VERSION = 'onchou-v7';
 
 // The whole app shell plus data/words.json are precached -- unlike jed/
 // kotoba (which have large on-demand data/ trees), onchou's entire dataset
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   'js/reference-audio.js',
   'js/pitch-detect.js',
   'js/mora-segment.js',
+  'js/pitch-contour.js',
   'js/app.js',
   'data/words.json',
 ];
