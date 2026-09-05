@@ -1,0 +1,395 @@
+:root {
+  --bg: #faf7f2;
+  --fg: #2b2b2b;
+  --accent: #c0392b;
+  --accent-dark: #962d22;
+  --accent-learner: #2f6fb5;
+  --card-bg: #ffffff;
+  --border: #e0d8cc;
+  --correct: #2e7d32;
+  --incorrect: #c0392b;
+  --mastery-new: #b0a999;
+  --mastery-learning: #c0392b;
+  --mastery-familiar: #d9a441;
+  --mastery-mastered: #2e7d32;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1a18;
+    --fg: #f0ece4;
+    --card-bg: #2a2622;
+    --border: #443d34;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Several component rules below (e.g. .rec-indicator, .diagram-row,
+   .mora-feedback) set `display` unconditionally for layout. Author-origin
+   rules beat the UA stylesheet's `[hidden] { display: none }` regardless of
+   selector specificity, so without this override those elements would stay
+   visible even while their `hidden` attribute is set. */
+[hidden] { display: none !important; }
+
+/* Restore native `[hidden]` semantics. Several component rules below set
+   `display` unconditionally (.rec-indicator, .diagram-row, .mora-feedback),
+   and an author-stylesheet rule always wins over the user-agent
+   stylesheet's `[hidden] { display: none }` regardless of selector
+   specificity -- so without this, toggling the `hidden` attribute/property
+   from JS has no visual effect on those elements. One general override
+   here keeps every current and future `hidden`-toggled element correctly
+   hidden, instead of special-casing `:not([hidden])` onto each component
+   rule that happens to set `display`. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, -apple-system, sans-serif;
+  min-height: 100%;
+}
+
+.app-header {
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 1.2rem 1rem 0.6rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0.05em;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  padding: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover, .icon-btn:focus-visible {
+  color: var(--accent);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 2rem;
+}
+
+/* Generic card container -- the word-quiz card, and anything else boxed
+   the same way, sits inside one of these. Onchou-specific layout (pitch
+   diagrams, record button, mora-match highlighting) is added during
+   integration, not here. */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem 1.2rem 1.5rem;
+  text-align: center;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
+
+button {
+  font-family: inherit;
+}
+
+.primary-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.9rem;
+  font-size: 1.05rem;
+  font-weight: bold;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  width: 100%;
+}
+
+.primary-btn:hover { background: var(--accent-dark); }
+
+.primary-btn:disabled {
+  background: var(--border);
+  color: var(--fg);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.note {
+  font-size: 0.8rem;
+  color: #8a8378;
+  margin-top: 0.4rem;
+}
+
+/* "▶ Play" reference-audio button (js/reference-audio.js). Small and
+   secondary -- it's a listening aid alongside the pitch diagram, not the
+   card's primary action. */
+.play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--accent-learner);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--accent-learner);
+  cursor: pointer;
+}
+
+.play-btn:hover, .play-btn:focus-visible {
+  background: var(--accent-learner);
+  color: #fff;
+}
+
+.play-btn:focus-visible {
+  outline: 2px solid var(--accent-learner);
+  outline-offset: 2px;
+}
+
+/* Visually-disabled state -- no Japanese voice found on this
+   device/browser. app.js decides *when* to apply this (via the
+   `disabled` attribute and/or `.disabled` class) and supplies the
+   accompanying inline note text (see .play-btn-note); this file only
+   owns the look. */
+.play-btn:disabled,
+.play-btn.disabled {
+  border-color: var(--border);
+  background: var(--card-bg);
+  color: var(--fg);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.play-btn:disabled:hover,
+.play-btn.disabled:hover {
+  background: var(--card-bg);
+  color: var(--fg);
+}
+
+.play-btn-note {
+  font-size: 0.8rem;
+  color: #8a8378;
+  margin-top: 0.3rem;
+}
+
+/* Pitch-accent plot (js/pitch-diagram.js): filled dots trace a word's own
+   morae at high/low pitch, connected by a line; one hollow trailing dot
+   stands for whatever follows the word (stays high only for heiban -- see
+   pitchLevels() in js/pitch-diagram.js). Ported from jlpt/kotoba's static
+   diagram convention, generalized with a 'target'/'learner' variant so the
+   known-correct pattern and the learner's detected recording render in
+   distinct colors when shown stacked. A third 'unclear' dot state (no
+   voiced pitch detected for that mora, from js/mora-segment.js) renders
+   smaller and greyed, sitting at a fixed mid-height between the H/L rows,
+   with no special-cased line gap. */
+.pitch-accent-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pitch-plot {
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.pitch-line-target {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.pitch-line-learner {
+  stroke: var(--accent-learner);
+  stroke-width: 1.5;
+}
+
+.pitch-dot-target {
+  fill: var(--accent);
+}
+
+.pitch-dot-learner {
+  fill: var(--accent-learner);
+}
+
+.pitch-dot-trailing {
+  fill: var(--card-bg);
+  stroke-width: 1.5;
+}
+
+.pitch-dot-trailing.pitch-dot-target {
+  fill: var(--card-bg);
+  stroke: var(--accent);
+}
+
+.pitch-dot-trailing.pitch-dot-learner {
+  fill: var(--card-bg);
+  stroke: var(--accent-learner);
+}
+
+/* 'unclear' mora (no voiced pitch detected) -- smaller, greyed, visually
+   distinct from both H and L regardless of variant. */
+.pitch-dot-unclear {
+  fill: var(--border);
+  stroke: none;
+}
+
+/* Recording-in-progress indicator: a small pulsing dot, placed next to the
+   Record/Stop button while a recording is active. Uses existing tokens
+   only (--accent for the dot color). Toggled via [hidden] around
+   PitchDetect.startRecording()/stopRecording() calls in js/app.js. */
+.rec-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin-top: 0.6rem;
+  justify-content: center;
+}
+.rec-indicator .rec-dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+/* Word card layout (js/app.js). */
+.word-card .word-text {
+  font-size: 2rem;
+  margin: 0 0 0.2rem;
+}
+
+.word-card .word-reading {
+  font-size: 1.1rem;
+  color: #8a8378;
+  margin: 0 0 1rem;
+}
+
+.diagram-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.8rem 0;
+}
+
+.diagram-row .diagram-label {
+  font-size: 0.75rem;
+  color: #8a8378;
+}
+
+.action-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+
+.shortcut-hint {
+  font-size: 0.75rem;
+  color: #8a8378;
+}
+
+.mora-feedback {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0;
+  flex-wrap: wrap;
+}
+
+.mora-feedback .mora-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+}
+
+.mora-feedback .mora-chip.match {
+  background: var(--correct);
+  border-color: var(--correct);
+  color: #fff;
+}
+
+.mora-feedback .mora-chip.mismatch {
+  background: var(--incorrect);
+  border-color: var(--incorrect);
+  color: #fff;
+}
+
+.mora-feedback .mora-chip.unclear {
+  background: var(--border);
+  color: var(--fg);
+}
+
+.score-text {
+  font-weight: bold;
+  margin: 0.4rem 0;
+}
+
+.inline-message {
+  font-size: 0.9rem;
+  color: var(--incorrect);
+  margin: 0.6rem 0;
+}
+
+.unsupported-notice {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+#unsupported-notice-text {
+  white-space: pre-line;
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>onchou</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="app-header">
+  <h1>音調 onchou</h1>
+</header>
+
+<div id="app">
+  <main>
+    <!-- Shown instead of the quiz UI when getUserMedia/Web Audio is
+         unsupported (feature-detected at load via PitchDetect.isSupported()). -->
+    <div id="unsupported-notice" class="card unsupported-notice" hidden>
+      <p>お使いのブラウザはマイク録音に対応していません。<br>
+      <span>This browser doesn't support microphone recording, so onchou's practice feature can't run here. Try a recent Chrome, Firefox, Edge, or Safari.</span></p>
+    </div>
+
+    <div id="quiz" class="card word-card" hidden>
+      <p id="word-text" class="word-text"></p>
+      <p id="word-reading" class="word-reading"></p>
+
+      <div class="diagram-row">
+        <span class="diagram-label">Target</span>
+        <div id="target-diagram"></div>
+      </div>
+
+      <div>
+        <button id="play-btn" class="play-btn" type="button" aria-describedby="play-btn-note">▶ Play</button>
+        <p id="play-btn-note" class="play-btn-note" hidden></p>
+      </div>
+
+      <div id="learner-diagram-row" class="diagram-row" hidden>
+        <span class="diagram-label">Your attempt</span>
+        <div id="learner-diagram"></div>
+      </div>
+
+      <div id="mora-feedback" class="mora-feedback" hidden></div>
+      <p id="score-text" class="score-text" hidden></p>
+      <p id="detect-message" class="inline-message" hidden></p>
+      <p id="mic-message" class="inline-message" hidden></p>
+
+      <span id="rec-indicator" class="rec-indicator" hidden><span class="rec-dot" aria-hidden="true"></span>Recording&hellip;</span>
+
+      <div class="action-row">
+        <button id="record-btn" class="primary-btn" type="button">Record</button>
+        <span class="shortcut-hint">Press Space to record/stop</span>
+      </div>
+      <div class="action-row">
+        <button id="retry-btn" class="secondary-btn" type="button" hidden>Retry</button>
+        <button id="next-btn" class="secondary-btn" type="button">Next word</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/pitch-diagram.js"></script>
+<script src="js/pitch-detect.js"></script>
+<script src="js/mora-segment.js"></script>
+<script src="js/reference-audio.js"></script>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js');
+    });
+  }
+</script>
+</body>
+</html>

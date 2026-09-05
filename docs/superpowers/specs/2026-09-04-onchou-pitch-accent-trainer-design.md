@@ -71,6 +71,22 @@ Runtime app code only ever reads `data/words.json` — it has no dependency on
 kotoba/jed being present on the deployed site, only at data-build time on the
 developer's machine.
 
+### 2026-09-05 addendum: word pool narrowed to kotoba only
+
+The implementation of the above build step revealed that jed's
+`data/words/*.json` is effectively an unfiltered JMdict dump, not a curated
+study list — unioning it in made the Kanjium intersection almost a no-op
+(107,018 of ~108k Kanjium entries survived, a 6.3MB `data/words.json` fully
+precached by the service worker on install). kotoba's vocab alone carries
+`frequencyRank` and reads like an actual study list, so **v1 ships with
+Kanjium ∩ kotoba only** (jed dropped from the union): 1,967 entries, 112KB.
+
+`tools/build-words.js` keeps `jedPairsFromEntries` exported and tested (in
+case a future revision wants to reintroduce a filtered subset of jed), but
+`main()` no longer calls it. A future revision could reconsider a larger
+pool (e.g. jed filtered by frequency/JLPT level rather than unioned in
+whole) if 1,967 words proves too small in practice.
+
 ## Pitch-accent diagram (reused, not new)
 
 Ported from `jlpt/js/app.js`'s existing `pitchLevels(moraCount, accentNum)`
