@@ -22,9 +22,10 @@ See the full design spec:
 
 ## Status
 
-Repo skeleton only — data vendoring, PWA shell, and shared styling are in
-place; the quiz UI, pitch-detection pipeline, and `js/app.js` wiring are not
-implemented yet (see the design spec for the full plan).
+Implemented: data vendoring and the `tools/build-words.js` build step, the
+PWA shell and shared styling, the quiz UI, the pitch-detection pipeline, and
+`js/app.js`'s wiring of all of it together (see the design spec for the full
+plan, and `CLAUDE.md` for the module breakdown).
 
 ## Running locally
 
@@ -49,6 +50,7 @@ data from the [Kanjium](https://github.com/mifunetoshiro/kanjium) project
 (via [kanji-data](https://github.com/bagustris/kanji-data) — see that
 repo's `CREDITS.md` for the licensing/attribution caveat). `data/words.json`
 — the flat `{word, reading, accentNum}` list the app actually reads at
-runtime — is generated from it by a one-time build script under `tools/`
-(not yet implemented); see the design spec's "Data" section for the exact
+runtime — is generated from it by the one-time build script
+`tools/build-words.js` (re-run manually when source vocab changes, not part
+of the runtime app); see the design spec's "Data" section for the exact
 build steps.

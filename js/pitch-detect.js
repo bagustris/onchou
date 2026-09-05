@@ -233,10 +233,16 @@
           // it throws, a `state = null` placed after the call would never
           // run, wedging `state` non-null forever and permanently rejecting
           // every future startRecording() call with 'already-recording'.
+          //
+          // Read `opts.onAutoStop` from the closure, not `state.onAutoStop`:
+          // if this fires while the ctx.resume() branch below is still
+          // pending, `state` is still the synchronous `{pending: true}`
+          // placeholder set at the top of startRecording(), which has no
+          // `.onAutoStop` -- reading it off `state` would silently drop the
+          // callback instead of telling the caller the recording ended.
           teardown();
-          var onAutoStop = state && state.onAutoStop;
           state = null;
-          if (onAutoStop) onAutoStop(trace.slice());
+          if (typeof opts.onAutoStop === 'function') opts.onAutoStop(trace.slice());
         }, MAX_DURATION_MS);
 
         function teardown() {
@@ -250,6 +256,17 @@
         }
 
         function begin() {
+          // If the MAX_DURATION_MS timeout above already fired and tore this
+          // pipeline down -- reachable when ctx.resume() below takes long
+          // enough to still be pending at the 3s mark -- don't resurrect
+          // `state` on top of an already-stopped/closed context. Reject
+          // instead, so the caller's .catch() runs rather than its .then()
+          // reporting a freshly-started recording that is actually already
+          // over (its onAutoStop callback already ran, or was skipped -- see
+          // the comment above).
+          if (stopped) {
+            return Promise.reject({ type: 'unknown', message: 'Recording ended before it could start.' });
+          }
           state = {
             trace: trace,
             teardown: teardown,
@@ -299,7 +316,14 @@
   }
 
   function stopRecording() {
-    if (!state) return [];
+    // `state` can be the synchronous `{pending: true}` placeholder set at
+    // the top of startRecording() (before getUserMedia has resolved), which
+    // has neither `.trace` nor `.teardown` -- guard against that, not just
+    // against `state` being null, or this throws. Not reachable through
+    // this app's own UI today (Record/Space are disabled for this whole
+    // window -- see app.js's recordingActive), but stopRecording() is a
+    // public entry point and must not crash if called during it.
+    if (!state || !state.trace) return [];
     var trace = state.trace.slice();
     state.teardown();
     state = null;

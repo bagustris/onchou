@@ -26,13 +26,6 @@
 
 * { box-sizing: border-box; }
 
-/* Several component rules below (e.g. .rec-indicator, .diagram-row,
-   .mora-feedback) set `display` unconditionally for layout. Author-origin
-   rules beat the UA stylesheet's `[hidden] { display: none }` regardless of
-   selector specificity, so without this override those elements would stay
-   visible even while their `hidden` attribute is set. */
-[hidden] { display: none !important; }
-
 /* Restore native `[hidden]` semantics. Several component rules below set
    `display` unconditionally (.rec-indicator, .diagram-row, .mora-feedback),
    and an author-stylesheet rule always wins over the user-agent

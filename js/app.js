@@ -114,7 +114,19 @@
     });
     els.playBtn.addEventListener('click', function () {
       if (!currentWord) return;
-      ReferenceAudio.speak(currentWord.reading).catch(function (err) {
+      // Snapshot the reading synchronously at click time. readyVoices()
+      // below can take up to VOICES_TIMEOUT_MS on a browser's first use
+      // (the voice list loads asynchronously) -- without waiting for it,
+      // an early click could call speak() while getVoices() still returns
+      // [], producing a spurious "no Japanese voice found" error even on a
+      // device that has one. Snapshotting `reading` (rather than reading
+      // currentWord.reading again once the wait resolves) keeps this
+      // playing the word that was current at click time even if the
+      // learner has since moved to the next word.
+      var reading = currentWord.reading;
+      ReferenceAudio.readyVoices().then(function () {
+        return ReferenceAudio.speak(reading);
+      }).catch(function (err) {
         els.playBtnNote.hidden = false;
         els.playBtnNote.textContent = (err && err.message) || 'Could not play reference audio.';
       });
@@ -299,7 +311,19 @@
     fetch('data/words.json')
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        words = data;
+        // A response that parses as JSON but isn't a non-empty array (an
+        // empty `[]`, or a malformed shape) isn't caught by the .catch()
+        // below, which only covers network/parse failures -- without this,
+        // pickRandomWord() would quietly return null forever, Record would
+        // stay enabled with no word loaded, and the first attempt would
+        // throw inside handleTrace() (moraCountFor(null)) with no
+        // user-visible message at all.
+        words = Array.isArray(data) ? data : [];
+        if (!words.length) {
+          els.detectMessage.hidden = false;
+          els.detectMessage.textContent = 'Could not load word data.';
+          return;
+        }
         nextWord();
         els.recordBtn.disabled = false;
       })

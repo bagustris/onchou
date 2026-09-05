@@ -17,8 +17,12 @@
     <!-- Shown instead of the quiz UI when getUserMedia/Web Audio is
          unsupported (feature-detected at load via PitchDetect.isSupported()). -->
     <div id="unsupported-notice" class="card unsupported-notice" hidden>
-      <p>お使いのブラウザはマイク録音に対応していません。<br>
-      <span>This browser doesn't support microphone recording, so onchou's practice feature can't run here. Try a recent Chrome, Firefox, Edge, or Safari.</span></p>
+      <!-- Populated entirely by js/app.js's boot() from UNSUPPORTED_MESSAGES,
+           keyed off PitchDetect.unsupportedReason() -- do not hardcode
+           fallback copy here (see style.css's #unsupported-notice-text,
+           which relies on this id existing to apply white-space: pre-line
+           to the message's embedded newline). -->
+      <p id="unsupported-notice-text"></p>
     </div>
 
     <div id="quiz" class="card word-card" hidden>
