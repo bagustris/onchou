@@ -26,6 +26,17 @@
     recordBtn: document.getElementById('record-btn'),
     retryBtn: document.getElementById('retry-btn'),
     nextBtn: document.getElementById('next-btn'),
+    btnSettings: document.getElementById('btn-settings'),
+    btnSettingsClose: document.getElementById('btn-settings-close'),
+    settingsOverlay: document.getElementById('settings-overlay'),
+    settingsPanel: document.getElementById('settings-panel'),
+    settingAutoPlay: document.getElementById('setting-auto-play'),
+    settingShowContour: document.getElementById('setting-show-contour'),
+    settingLevelButtons: Array.prototype.slice.call(
+      document.querySelectorAll('#setting-level .segmented-btn')
+    ),
+    installButton: document.getElementById('btn-install'),
+    installHint: document.getElementById('settings-install-hint'),
   };
 
   var words = [];
@@ -47,9 +58,13 @@
   // disablePlayButton and the Play click handler's .catch).
   var playPermanentlyUnavailable = false;
 
-  function pickRandomWord() {
-    if (!words.length) return null;
-    return words[Math.floor(Math.random() * words.length)];
+  // Selection is delegated to js/word-select.js: the learner's chosen level
+  // caps word length, and the pick is balanced across whichever accent
+  // patterns that level makes available (heiban otherwise dominates the
+  // pool -- see that module's header and the learning-progression design
+  // spec).
+  function pickNextWord() {
+    return WordSelect.pickWord(words, SettingsManager.get('level'));
   }
 
   function moraCountFor(word) {
@@ -97,11 +112,21 @@
     var levels = targetLevelsFor(word);
     els.targetDiagram.innerHTML = PitchDiagram.renderSVG(levels, { variant: 'target' });
     resetAttemptUI();
+    if (SettingsManager.get('autoPlayReference')) playReference();
   }
 
   function nextWord() {
-    var word = pickRandomWord();
-    if (word) renderWord(word);
+    var word = pickNextWord();
+    if (word) {
+      renderWord(word);
+      return;
+    }
+    // No word survived the level filter. Can't happen with the shipped
+    // data/words.json (the narrowest level, "2", still has 291 words), but
+    // silently doing nothing on a "Next word" tap would be a dead-end with
+    // no explanation if that ever changed -- say so instead.
+    els.detectMessage.hidden = false;
+    els.detectMessage.textContent = 'No words available at this practice level -- widen it in Settings.';
   }
 
   // ---- Reference audio ("▶ Play") ----
@@ -117,23 +142,25 @@
       }
     });
     els.playBtn.addEventListener('click', function () {
-      if (!currentWord) return;
-      // Snapshot the reading synchronously at click time. readyVoices()
-      // below can take up to VOICES_TIMEOUT_MS on a browser's first use
-      // (the voice list loads asynchronously) -- without waiting for it,
-      // an early click could call speak() while getVoices() still returns
-      // [], producing a spurious "no Japanese voice found" error even on a
-      // device that has one. Snapshotting `reading` (rather than reading
-      // currentWord.reading again once the wait resolves) keeps this
-      // playing the word that was current at click time even if the
-      // learner has since moved to the next word.
-      var reading = currentWord.reading;
-      ReferenceAudio.readyVoices().then(function () {
-        return ReferenceAudio.speak(reading);
-      }).catch(function (err) {
-        els.playBtnNote.hidden = false;
-        els.playBtnNote.textContent = (err && err.message) || 'Could not play reference audio.';
-      });
+      playReference();
+    });
+  }
+
+  // Speaks the current word's reading -- shared by the "▶ Play" button and,
+  // when the auto-play setting is on, renderWord()'s new-word path. Snapshots
+  // `reading` synchronously at call time rather than re-reading
+  // currentWord.reading once readyVoices() resolves: readyVoices() can take
+  // up to VOICES_TIMEOUT_MS on a browser's first use (the voice list loads
+  // asynchronously), and without a snapshot a word change during that wait
+  // could end up speaking the wrong word.
+  function playReference() {
+    if (!currentWord) return;
+    var reading = currentWord.reading;
+    ReferenceAudio.readyVoices().then(function () {
+      return ReferenceAudio.speak(reading);
+    }).catch(function (err) {
+      els.playBtnNote.hidden = false;
+      els.playBtnNote.textContent = (err && err.message) || 'Could not play reference audio.';
     });
   }
 
@@ -178,17 +205,27 @@
       return;
     }
 
-    var targetPattern = targetLevelsFor(word).slice(0, moraCount);
+    var fullTargetLevels = targetLevelsFor(word);
+    var targetPattern = fullTargetLevels.slice(0, moraCount);
     var score = MoraSegment.scorePattern(learnerPattern, targetPattern);
 
+    // Append a trailing hollow dot to the learner diagram too, mirroring the
+    // TARGET's trailing level -- purely for visual alignment with the
+    // target diagram above it (same dot count, same x-positions), not a
+    // claim about anything actually measured. The mic recording stops at
+    // the word itself, so there's no real detected pitch for whatever comes
+    // after it (see docs/2026-09-05-pitch-accent-evaluation-research-plan.md
+    // for the future-data-collection note this gap motivates).
+    var trailingLevel = fullTargetLevels[fullTargetLevels.length - 1];
     els.learnerDiagramRow.hidden = false;
-    els.learnerDiagram.innerHTML = PitchDiagram.renderSVG(learnerPattern, {
+    els.learnerDiagram.innerHTML = PitchDiagram.renderSVG(learnerPattern.concat([trailingLevel]), {
       variant: 'learner',
-      trailing: false,
     });
 
-    els.contourRow.hidden = false;
-    els.contourGraph.innerHTML = PitchContour.renderSVG(trace, targetLevelsFor(word), segmented);
+    if (SettingsManager.get('showContour')) {
+      els.contourRow.hidden = false;
+      els.contourGraph.innerHTML = PitchContour.renderSVG(trace, fullTargetLevels, segmented);
+    }
 
     els.moraFeedback.hidden = false;
     els.moraFeedback.innerHTML = score.perMora.map(function (status, i) {
@@ -280,6 +317,128 @@
     });
   }
 
+  // ---- Settings dialog ----
+  //
+  // A plain modal (backdrop click / Escape / close button dismiss it)
+  // rather than a full focus trap -- reached by mouse/touch or Tab, same
+  // scope jlpt/kotoba/jed/wanikanji's own settings dialogs use.
+
+  function openSettings() {
+    els.settingsOverlay.hidden = false;
+    renderInstallRow();
+    els.btnSettingsClose.focus();
+  }
+
+  function closeSettings() {
+    els.settingsOverlay.hidden = true;
+    els.btnSettings.focus();
+  }
+
+  // PWA install: Chrome/Edge/Android fire `beforeinstallprompt`, which is
+  // stashed until the learner opens Settings. Browsers with no such event
+  // (iOS Safari, desktop Safari/Firefox) get a manual "Add to Home Screen"
+  // hint instead, since there's no install API to call there.
+  var deferredInstallPrompt = null;
+
+  function isStandaloneDisplay() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function renderInstallRow() {
+    if (isStandaloneDisplay()) {
+      els.installButton.hidden = true;
+      els.installHint.textContent = 'インストール済み — Already installed';
+      els.installHint.hidden = false;
+      return;
+    }
+    if (deferredInstallPrompt) {
+      els.installButton.hidden = false;
+      els.installHint.hidden = true;
+      return;
+    }
+    els.installButton.hidden = true;
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    els.installHint.textContent = isIOS
+      ? '共有ボタン → ホーム画面に追加 — Share button → Add to Home Screen'
+      : 'ブラウザメニューの「インストール」から追加できます — Use your browser menu → Install app';
+    els.installHint.hidden = false;
+  }
+
+  // Reflects the stored level on the segmented control. Also used at setup
+  // time, so the markup's hardcoded `.active` (on "All", the default) is
+  // corrected to whatever the learner actually chose last session.
+  function syncLevelButtons() {
+    var level = SettingsManager.get('level');
+    els.settingLevelButtons.forEach(function (btn) {
+      var active = btn.dataset.value === level;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  }
+
+  function setupSettingsPanel() {
+    els.btnSettings.addEventListener('click', openSettings);
+    els.btnSettingsClose.addEventListener('click', closeSettings);
+    els.settingsOverlay.addEventListener('click', function (e) {
+      if (e.target === els.settingsOverlay) closeSettings();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !els.settingsOverlay.hidden) closeSettings();
+    });
+
+    els.settingAutoPlay.checked = SettingsManager.get('autoPlayReference');
+    els.settingAutoPlay.addEventListener('change', function () {
+      SettingsManager.set('autoPlayReference', els.settingAutoPlay.checked);
+    });
+
+    els.settingShowContour.checked = SettingsManager.get('showContour');
+    els.settingShowContour.addEventListener('change', function () {
+      SettingsManager.set('showContour', els.settingShowContour.checked);
+      // Take effect immediately on the attempt already on screen, not just
+      // the next recording -- turning it off should hide it right away,
+      // and turning it on should reveal it if a trace has already been
+      // scored (contourGraph.innerHTML is only ever populated when a
+      // completed attempt exists, so an empty one here is never mistaken
+      // for "should be showing").
+      if (!els.settingShowContour.checked) {
+        els.contourRow.hidden = true;
+      } else if (els.contourGraph.innerHTML) {
+        els.contourRow.hidden = false;
+      }
+    });
+
+    syncLevelButtons();
+    els.settingLevelButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        SettingsManager.set('level', btn.dataset.value);
+        syncLevelButtons();
+        // Deliberately does NOT re-pick the current word -- the new level
+        // applies from the next "Next word" on, matching how the auto-play
+        // and pitch-curve settings above also only affect what happens
+        // next rather than rewriting what's already on screen.
+      });
+    });
+
+    els.installButton.addEventListener('click', function () {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function () {
+        deferredInstallPrompt = null;
+        renderInstallRow();
+      });
+    });
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      renderInstallRow();
+    });
+    window.addEventListener('appinstalled', function () {
+      deferredInstallPrompt = null;
+      renderInstallRow();
+    });
+  }
+
   // ---- Boot ----
 
   // Distinct, accurate copy per PitchDetect.unsupportedReason() -- telling a
@@ -302,6 +461,11 @@
   };
 
   function boot() {
+    // Independent of mic/Web Audio support -- the settings dialog (install
+    // prompt, auto-play toggle) works the same whether or not the quiz UI
+    // below is available.
+    setupSettingsPanel();
+
     var reason = PitchDetect.unsupportedReason();
     if (reason) {
       els.unsupportedNoticeText.textContent = UNSUPPORTED_MESSAGES[reason] || UNSUPPORTED_MESSAGES['no-media-devices'];
@@ -321,7 +485,7 @@
         // A response that parses as JSON but isn't a non-empty array (an
         // empty `[]`, or a malformed shape) isn't caught by the .catch()
         // below, which only covers network/parse failures -- without this,
-        // pickRandomWord() would quietly return null forever, Record would
+        // pickNextWord() would quietly return null forever, Record would
         // stay enabled with no word loaded, and the first attempt would
         // throw inside handleTrace() (moraCountFor(null)) with no
         // user-visible message at all.

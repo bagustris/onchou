@@ -68,6 +68,22 @@ dialectal accent, disfluency). Plan:
 This is the current hard dependency and the reason for the 2-3 year
 horizon — the above evaluation cannot start without it.
 
+### Known gap this motivates: no real trailing-particle pitch data
+
+The app's "Your attempt" pitch diagram (`js/app.js`'s `handleTrace`) shows a
+trailing hollow dot after the learner's own morae, mirroring the *target*
+diagram's trailing dot purely for visual/positional symmetry between the two
+— it is not a measurement. The target's trailing dot represents the
+analytically-known pitch of whatever follows the word (derived from the
+Kanjium accent rule in `PitchDiagram.pitchLevels`), but the app's mic
+recording captures only the word itself (bounded by
+`PitchDetect.startRecording`'s max duration), so there is no equivalent real
+detected value for the learner. Any future recording protocol for the
+data-collection effort above should consider having speakers continue
+slightly past the target word (e.g. into a following particle like は/が/を)
+so a *real* detected trailing pitch becomes available to validate — or
+replace — this mirrored placeholder.
+
 Open questions to resolve before collection begins (not yet decided):
 
 - **Scope**: how many speakers, how many words per speaker, and what

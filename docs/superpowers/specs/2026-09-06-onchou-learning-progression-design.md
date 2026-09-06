@@ -37,6 +37,17 @@ evidence the design below is based on.
 | 9  | 3   | –   | –   | 3   | –  |
 | 10 | 1   | –   | –   | 1   | –  |
 
+Resulting cumulative pool per level (verified against the shipped data —
+note each level includes everything shorter, so level "2" also picks up the
+14 one-mora words):
+
+| Level | Pool | Patterns available |
+|---|---|---|
+| 2   | 305  | heiban 97, atamadaka 136, odaka 72 (no nakadaka) |
+| 3   | 930  | heiban 410, atamadaka 268, nakadaka 140, odaka 112 |
+| 4   | 1616 | heiban 867, atamadaka 333, nakadaka 295, odaka 121 |
+| All | 1967 | heiban 955, atamadaka 337, nakadaka 543, odaka 132 |
+
 Two structural facts this table confirms:
 
 - **Nakadaka is impossible below 3 morae** (it requires `1 < accentNum <

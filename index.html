@@ -9,8 +9,58 @@
 </head>
 <body>
 <header class="app-header">
+  <button id="btn-settings" type="button" class="icon-btn settings-btn" aria-haspopup="dialog" aria-label="設定 Settings">
+    <span class="hamburger-icon"><span></span><span></span><span></span></span>
+  </button>
   <h1>音調 onchou</h1>
 </header>
+
+<div id="settings-overlay" class="settings-overlay" hidden>
+  <div id="settings-panel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings-header">
+      <h2 id="settings-title">設定<span>Settings</span></h2>
+      <button id="btn-settings-close" type="button" class="icon-btn" aria-label="閉じる Close">&times;</button>
+    </div>
+
+    <div class="settings-row">
+      <span class="settings-row-label" id="setting-auto-play-label">自動再生<span>Auto-play reference audio for each new word</span></span>
+      <label class="switch">
+        <input type="checkbox" id="setting-auto-play" aria-labelledby="setting-auto-play-label">
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="settings-row">
+      <span class="settings-row-label" id="setting-show-contour-label">ピッチカーブを表示<span>Show raw pitch-curve graph</span></span>
+      <label class="switch">
+        <input type="checkbox" id="setting-show-contour" aria-labelledby="setting-show-contour-label">
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
+    <div class="settings-row settings-row-column">
+      <span class="settings-row-label">練習レベル<span>Practice level (word length, cumulative)</span></span>
+      <div id="setting-level" class="settings-segmented" role="radiogroup" aria-label="Practice level">
+        <button type="button" role="radio" aria-checked="false" class="segmented-btn" data-value="2">2<span>≤2 拍</span></button>
+        <button type="button" role="radio" aria-checked="false" class="segmented-btn" data-value="3">3<span>≤3 拍</span></button>
+        <button type="button" role="radio" aria-checked="false" class="segmented-btn" data-value="4">4<span>≤4 拍</span></button>
+        <button type="button" role="radio" aria-checked="true" class="segmented-btn active" data-value="all">全部<span>All</span></button>
+      </div>
+    </div>
+
+    <div class="settings-row settings-row-column">
+      <span class="settings-row-label">アプリとしてインストール<span>Install on PC &amp; smartphone</span></span>
+      <button id="btn-install" type="button" class="settings-install-btn" hidden>インストール<span>Install</span></button>
+      <p id="settings-install-hint" class="settings-install-hint" hidden></p>
+    </div>
+
+    <div class="settings-row settings-row-column settings-about">
+      <span class="settings-row-label">このアプリについて<span>About</span></span>
+      <p class="about-app">音調 onchou</p>
+      <a class="about-link" href="https://github.com/bagustris/onchou" target="_blank" rel="noopener noreferrer">貢献・問題報告<span>Contribute / report an issue on GitHub</span></a>
+    </div>
+  </div>
+</div>
 
 <div id="app">
   <main>
@@ -73,6 +123,8 @@
 <script src="js/mora-segment.js"></script>
 <script src="js/pitch-contour.js"></script>
 <script src="js/reference-audio.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/word-select.js"></script>
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
