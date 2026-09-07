@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ピッチアクセント入門 — onchou tutorial</title>
+<link rel="manifest" href="../manifest.json">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="tutorial-page">
+<header class="app-header">
+  <a class="tutorial-back" href="../">&larr; onchou</a>
+  <h1>ピッチアクセント入門</h1>
+  <p class="tutorial-subtitle">A short guide to Japanese pitch accent</p>
+</header>
+
+<main class="tutorial">
+  <nav class="tutorial-toc" aria-label="Contents">
+    <a href="#what">1. What pitch accent is</a>
+    <a href="#mora">2. Moras, not syllables</a>
+    <a href="#reading">3. Reading the diagrams</a>
+    <a href="#patterns">4. The four patterns</a>
+    <a href="#pairs">5. Minimal pairs</a>
+    <a href="#practice">6. How to practice in onchou</a>
+  </nav>
+
+  <section id="what" class="card tutorial-section">
+    <h2>1. 高低アクセントとは<span>What pitch accent is</span></h2>
+    <p>
+      Japanese is not a stress language. English marks an accented syllable by
+      making it <em>louder and longer</em> (<span class="tutorial-en">RE-cord</span>
+      vs <span class="tutorial-en">re-CORD</span>); Japanese marks it by
+      <strong>pitch</strong> — the voice sits high or low on each mora, and the
+      word is identified by <em>where the pitch drops</em>.
+    </p>
+    <p>
+      Two rules do most of the work in standard (Tokyo) Japanese:
+    </p>
+    <ul>
+      <li>The pitch falls <strong>at most once</strong> in a word. Once it has
+        dropped, it never climbs back up inside that word.</li>
+      <li>The first two moras always <strong>differ</strong>: if mora 1 is high,
+        mora 2 is low, and vice versa. There is no flat start.</li>
+    </ul>
+    <p>
+      So a word's accent can be described by a single number: the mora after
+      which the pitch drops. That number is the <strong>accent number</strong>
+      (核 <span class="tutorial-en">downstep position</span>) — <code>0</code>
+      means it never drops. onchou stores exactly this number per word, taken
+      from the Kanjium accent database.
+    </p>
+  </section>
+
+  <section id="mora" class="card tutorial-section">
+    <h2>2. 拍（モーラ）<span>Moras, not syllables</span></h2>
+    <p>
+      Pitch is assigned per <strong>mora</strong> (拍), not per syllable. A mora
+      is one kana-sized beat:
+    </p>
+    <ul>
+      <li>Each full kana is one mora: か, さ, ん, っ, ー.</li>
+      <li>A small kana (ゃ, ゅ, ょ, ぁ…) attaches to the kana before it:
+        きょ = <strong>one</strong> mora, not two.</li>
+      <li>ん, っ and the long vowel ー each count as a mora of their own.</li>
+    </ul>
+    <p class="tutorial-examples">
+      とうきょう → と・う・きょ・う（4拍）<br>
+      がっこう → が・っ・こ・う（4拍）<br>
+      しゃしん → しゃ・し・ん（3拍）
+    </p>
+    <p>
+      Counting moras correctly matters, because the accent number counts moras.
+      onchou splits readings by this same rule before drawing a diagram or
+      scoring your attempt.
+    </p>
+  </section>
+
+  <section id="reading" class="card tutorial-section">
+    <h2>3. 図の読み方<span>Reading the diagrams</span></h2>
+    <p>
+      A diagram has one dot per mora — high dot = high pitch, low dot = low
+      pitch — plus one <strong>hollow trailing dot</strong> for whatever comes
+      <em>after</em> the word (a particle like は or が).
+    </p>
+    <div class="tutorial-diagram-row">
+      <div class="tutorial-diagram" data-reading="でんわ" data-accent="0">
+        <span class="tutorial-diagram-caption">でんわ + が</span>
+      </div>
+      <div class="tutorial-diagram" data-reading="おとこ" data-accent="3">
+        <span class="tutorial-diagram-caption">おとこ + が</span>
+      </div>
+    </div>
+    <p>
+      Across the word itself these two are identical (low-high-high). They
+      differ only in the trailing dot: 電話が stays high, 男が drops. That is
+      why the hollow dot is drawn at all — without it, two different patterns
+      would look the same.
+    </p>
+    <p>
+      In the quiz, the <span class="tutorial-swatch tutorial-swatch-target"></span>
+      red diagram is the target pattern and the
+      <span class="tutorial-swatch tutorial-swatch-learner"></span> blue one is
+      what onchou detected in your recording. A grey, smaller dot means
+      <em>unclear</em> — no voiced pitch was found for that mora (too quiet, or
+      a devoiced/whispered mora).
+    </p>
+  </section>
+
+  <section id="patterns" class="card tutorial-section">
+    <h2>4. 四つの型<span>The four patterns</span></h2>
+    <p>Every word falls into one of four types.</p>
+
+    <div class="tutorial-pattern">
+      <h3>平板型 <span>heiban — accent 0</span></h3>
+      <div class="tutorial-diagram" data-reading="さくら" data-accent="0">
+        <span class="tutorial-diagram-caption">桜 さくら</span>
+      </div>
+      <p>Low first mora, then high to the end — and it <em>stays</em> high onto
+        the following particle. No drop anywhere. The most common pattern, which
+        is why onchou deliberately balances the draw across patterns instead of
+        picking words at random.</p>
+    </div>
+
+    <div class="tutorial-pattern">
+      <h3>頭高型 <span>atamadaka — accent 1</span></h3>
+      <div class="tutorial-diagram" data-reading="あめ" data-accent="1">
+        <span class="tutorial-diagram-caption">雨 あめ</span>
+      </div>
+      <p>High on the very first mora, then low for the rest. The drop happens
+        immediately after mora 1.</p>
+    </div>
+
+    <div class="tutorial-pattern">
+      <h3>中高型 <span>nakadaka — drop inside the word</span></h3>
+      <div class="tutorial-diagram" data-reading="こころ" data-accent="2">
+        <span class="tutorial-diagram-caption">心 こころ</span>
+      </div>
+      <p>Low, then high, then a drop <em>before</em> the last mora. Only possible
+        for words of 3+ moras.</p>
+    </div>
+
+    <div class="tutorial-pattern">
+      <h3>尾高型 <span>odaka — drop after the last mora</span></h3>
+      <div class="tutorial-diagram" data-reading="おとこ" data-accent="3">
+        <span class="tutorial-diagram-caption">男 おとこ</span>
+      </div>
+      <p>High through the final mora, dropping only on what follows. Inside the
+        word this is identical to heiban — you can only hear the difference by
+        adding a particle, so say 男が, not 男 alone.</p>
+    </div>
+  </section>
+
+  <section id="pairs" class="card tutorial-section">
+    <h2>5. 同音異義語<span>Minimal pairs</span></h2>
+    <p>
+      Pitch alone distinguishes these. Say each pair out loud with が attached
+      and listen for where — or whether — your voice falls.
+    </p>
+
+    <div class="tutorial-table-scroll">
+    <table class="tutorial-pairs">
+      <thead>
+        <tr><th>読み</th><th>語</th><th>型</th><th>図</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">あめ</td>
+          <td>雨 <span class="tutorial-en">rain</span></td><td>頭高 (1)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="あめ" data-accent="1"></span></td>
+        </tr>
+        <tr>
+          <td>飴 <span class="tutorial-en">candy</span></td><td>平板 (0)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="あめ" data-accent="0"></span></td>
+        </tr>
+        <tr>
+          <td rowspan="3">はし</td>
+          <td>箸 <span class="tutorial-en">chopsticks</span></td><td>頭高 (1)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="はし" data-accent="1"></span></td>
+        </tr>
+        <tr>
+          <td>橋 <span class="tutorial-en">bridge</span></td><td>尾高 (2)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="はし" data-accent="2"></span></td>
+        </tr>
+        <tr>
+          <td>端 <span class="tutorial-en">edge</span></td><td>平板 (0)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="はし" data-accent="0"></span></td>
+        </tr>
+        <tr>
+          <td rowspan="2">かみ</td>
+          <td>神 <span class="tutorial-en">god</span></td><td>頭高 (1)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="かみ" data-accent="1"></span></td>
+        </tr>
+        <tr>
+          <td>紙 <span class="tutorial-en">paper</span></td><td>平板 (0)</td>
+          <td><span class="tutorial-diagram tutorial-diagram-inline" data-reading="かみ" data-accent="0"></span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="tutorial-note">
+      Note that 橋 (odaka) and 端 (heiban) sound the same by themselves —
+      橋が falls, 端が does not.
+    </p>
+  </section>
+
+  <section id="practice" class="card tutorial-section">
+    <h2>6. 練習のしかた<span>How to practice in onchou</span></h2>
+    <ol>
+      <li><strong>Look at the target diagram first.</strong> Decide where your
+        voice has to drop before you open your mouth.</li>
+      <li><strong>Play the reference</strong> (▶ Play) and shadow it — imitate
+        immediately, without pausing to analyse.</li>
+      <li><strong>Record</strong> (button, or the Space key). Speak the word
+        alone, at a normal volume, close to the mic, in a quiet room.</li>
+      <li><strong>Compare the two diagrams.</strong> The score counts moras that
+        matched; look at <em>which</em> mora went wrong rather than the number.</li>
+      <li><strong>Turn on the pitch curve</strong> in settings if a mora keeps
+        coming out "unclear" or wrong — the raw F0 trace shows whether you glide
+        instead of stepping, or trail off at the end.</li>
+      <li><strong>Start short.</strong> Set the practice level to ≤2 moras until
+        atamadaka vs heiban is automatic, then widen it.</li>
+    </ol>
+    <p class="tutorial-note">
+      Two habits fix most mistakes: keep the pitch <em>flat</em> within a mora
+      instead of sliding, and do not let the last mora sag — a dying voice reads
+      as a drop that was not there.
+    </p>
+  </section>
+
+  <p class="tutorial-source">
+    Accent data from the
+    <a href="https://github.com/mifunetoshiro/kanjium" target="_blank" rel="noopener noreferrer">Kanjium</a>
+    pitch-accent database.
+  </p>
+</main>
+
+<script src="../js/pitch-diagram.js"></script>
+<script>
+  // Render every [data-reading]/[data-accent] placeholder with the app's own
+  // diagram renderer, so the tutorial can never drift from what the quiz draws.
+  document.querySelectorAll('.tutorial-diagram').forEach((el) => {
+    const moras = PitchDiagram.moraSplit(el.dataset.reading);
+    const levels = PitchDiagram.pitchLevels(moras.length, Number(el.dataset.accent));
+    const svg = PitchDiagram.renderSVG(levels, { label: `${el.dataset.reading}: ${levels.join('')}` });
+    el.insertAdjacentHTML('afterbegin', svg);
+  });
+</script>
+</body>
+</html>
