@@ -91,12 +91,32 @@
       utterance.voice = voice;
       utterance.lang = voice.lang;
       utterance.onend = () => resolve();
-      utterance.onerror = (e) => reject(e && e.error ? new Error(e.error) : e);
+      utterance.onerror = (e) => {
+        // 'canceled'/'interrupted' aren't failures -- they're what the
+        // browser reports when something (a word change, or the start of a
+        // recording, both of which call cancel() below so the mic doesn't
+        // pick up the TTS) deliberately stopped this utterance. Rejecting
+        // them would surface "canceled" to the learner as a playback error
+        // note under the Play button.
+        const reason = e && e.error;
+        if (reason === 'canceled' || reason === 'interrupted') return resolve();
+        reject(reason ? new Error(reason) : e);
+      };
       // A fresh utterance per call (never reused) -- SpeechSynthesisUtterance
       // instances are single-use in every implementation.
       synth.speak(utterance);
     });
   }
 
-  return { supported, hasJapaneseVoice, readyVoices, speak, isJapaneseVoice, pickJapaneseVoice };
+  // Stops anything currently being spoken (and clears the queue). Needed
+  // before recording starts -- an in-flight reference utterance would
+  // otherwise be picked up by the microphone and analyzed as if it were the
+  // learner's own voice -- and on a word change, so a queued utterance for
+  // the previous word can't speak over the new one.
+  function cancel() {
+    if (!supported()) return;
+    try { self.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  }
+
+  return { supported, hasJapaneseVoice, readyVoices, speak, cancel, isJapaneseVoice, pickJapaneseVoice };
 });

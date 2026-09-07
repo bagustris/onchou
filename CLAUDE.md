@@ -68,7 +68,12 @@ dependency order, each an IIFE-scoped global:
    silently truncate in a backgrounded tab). Also exposes
    `PitchDetect.isSupported()`, used by `app.js` to show
    `#unsupported-notice` instead of the quiz UI on browsers without
-   `getUserMedia`/Web Audio.
+   `getUserMedia`/Web Audio. A `MediaRecorder` tap on the *same* stream the
+   analyser reads hands the caller a playable `Blob` of the take via
+   `opts.onAudio` (so playback is exactly the audio that was scored), always
+   *after* the trace — MediaRecorder flushes its last chunk asynchronously —
+   and `null` on browsers where it isn't available (`playbackSupported()`),
+   which must never gate recording itself.
 3. `js/mora-segment.js` (`MoraSegment`) — pure, DOM-free functions turning
    a raw pitch trace into a per-mora H/L/unclear pattern and scoring it
    against a target pattern; unit-tested against synthetic traces.
@@ -83,7 +88,11 @@ dependency order, each an IIFE-scoped global:
 5. `js/reference-audio.js` (`ReferenceAudio`) — the "▶ Play" button's
    backing module, via `window.speechSynthesis` only (no server-side TTS
    fallback); pure voice filtering/ranking helpers are Node-testable, live
-   `speechSynthesis` calls are browser-only.
+   `speechSynthesis` calls are browser-only. `cancel()` is called by
+   `app.js` on every word change and at the start of every recording — an
+   utterance still playing is picked up by the mic and scored as the
+   learner's own voice — so `speak()` resolves (rather than rejects) on the
+   `canceled`/`interrupted` error the browser reports for a deliberate stop.
 6. `js/settings.js` (`SettingsManager`) — `localStorage`-backed user
    preferences (`autoPlayReference`, `showContour`, `level`) under the
    `onchou-settings` key, surfaced by the hamburger settings panel ported
@@ -105,6 +114,26 @@ dependency order, each an IIFE-scoped global:
    + score the learner's attempt against the target), owns the settings
    dialog and PWA install prompt, and drives
    `#unsupported-notice` / `#quiz` visibility via `PitchDetect.isSupported()`.
+   Also owns attempt playback (`#playback-row`): "⇄ Compare" plays the
+   reference then the learner's own take back to back (the comparison, not
+   either clip alone, is what tells the learner where their drop landed),
+   with "▶ Your voice" for the recording alone. Deliberately not behind a
+   setting — self-monitoring is core to the exercise, and hearing the take
+   is the only way to tell a real mispronunciation apart from an F0-tracking
+   artifact or a too-quiet mora. An `attemptSeq` counter guards the async
+   `Blob` arrival: object URLs are revoked and the sequence bumped on every
+   word change/Retry/Record, so a late `Blob` can't be offered as playback
+   of an attempt already cleared.
+
+`tutorial/index.html` is a static prose page (linked from the settings
+About block, served at `/onchou/tutorial`) explaining moras, the accent
+number, the four patterns and minimal pairs. Its example diagrams are
+generated at load time through `PitchDiagram` itself rather than hand-drawn
+SVG, so they can't drift from what the quiz renders. Note `sw.js`'s fetch
+handler special-cases navigations: returning a *redirected* response (e.g.
+`/tutorial` → `/tutorial/`) from `respondWith()` fails a navigate-mode
+request outright (`ERR_FAILED`), so those are re-issued as a synthesized
+`Response.redirect`.
 
 `index.html` also registers `sw.js` inline (feature-detected,
 `http`/`https` only) after the module scripts, matching the sibling-app

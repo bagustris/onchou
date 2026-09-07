@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'onchou-v10';
+const CACHE_VERSION = 'onchou-v17';
 
 // The whole app shell plus data/words.json are precached -- unlike jed/
 // kotoba (which have large on-demand data/ trees), onchou's entire dataset
@@ -6,6 +6,8 @@ const CACHE_VERSION = 'onchou-v10';
 const CORE_ASSETS = [
   '.',
   'index.html',
+  'tutorial/',
+  'tutorial/index.html',
   'style.css',
   'manifest.json',
   'icon.svg',
@@ -51,6 +53,34 @@ self.addEventListener('fetch', (event) => {
   // instead of hitting the network, defeating the browser's own
   // update-detection.
   if (url.pathname.endsWith('/sw.js')) return;
+
+  // A navigation whose response is an HTTP redirect (e.g. `/tutorial` ->
+  // `/tutorial/`, which every static host emits for a directory URL without
+  // its trailing slash) cannot be handed back through respondWith(): the
+  // browser rejects a redirected response for a navigate-mode request and
+  // fails the load outright (ERR_FAILED). Re-issue it as a synthesized
+  // redirect so the browser performs the hop itself and re-requests the
+  // canonical URL, which this handler then serves normally.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        try {
+          const response = await fetch(event.request);
+          if (response.redirected) return Response.redirect(response.url, 302);
+          if (response.ok) {
+            const cache = await caches.open(CACHE_VERSION);
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        } catch (err) {
+          return (await caches.match('index.html')) || Response.error();
+        }
+      })()
+    );
+    return;
+  }
 
   event.respondWith(
     caches.open(CACHE_VERSION).then(async (cache) => {

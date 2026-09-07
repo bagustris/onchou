@@ -16,6 +16,10 @@
     playBtnNote: document.getElementById('play-btn-note'),
     learnerDiagramRow: document.getElementById('learner-diagram-row'),
     learnerDiagram: document.getElementById('learner-diagram'),
+    playbackRow: document.getElementById('playback-row'),
+    compareBtn: document.getElementById('compare-btn'),
+    playAttemptBtn: document.getElementById('play-attempt-btn'),
+    playbackNote: document.getElementById('playback-note'),
     contourRow: document.getElementById('contour-row'),
     contourGraph: document.getElementById('contour-graph'),
     moraFeedback: document.getElementById('mora-feedback'),
@@ -52,11 +56,30 @@
   // somehow got through can't score a trace against the wrong word.
   var recordingActive = false;
   var recordingWord = null;
+  // True if the tab was hidden at any point during the recording span.
+  // Chrome (and other browsers) throttle setInterval to ~1Hz in a hidden
+  // tab, so pitch-detect.js's 20ms polling collapses to ~1 frame/second
+  // there: the trace still segments and scores, but off 2-3 frames instead
+  // of ~150, which is noise dressed up as a result. Scoring that silently
+  // would teach the learner the wrong thing about their own pronunciation,
+  // so handleTrace() reports it instead. See pitch-detect.js's header.
+  var recordingWasHidden = false;
   // Set once (permanently) when no Japanese voice exists on this device at
   // all -- distinguishes that permanent condition from a transient per-click
   // playback failure, both of which write to els.playBtnNote (see
   // disablePlayButton and the Play click handler's .catch).
   var playPermanentlyUnavailable = false;
+
+  // Playback of the learner's own take. `attemptSeq` is bumped for every
+  // recording started; PitchDetect's onAudio callback carries the sequence
+  // number its recording began with, so a Blob that arrives after the
+  // learner has already hit Retry or Next (MediaRecorder flushes
+  // asynchronously, so this ordering is normal, not exotic) is discarded
+  // instead of being offered as playback of the attempt now on screen.
+  var attemptSeq = 0;
+  var attemptAudioUrl = null;
+  var attemptAudio = null;
+  var comparing = false;
 
   // Selection is delegated to js/word-select.js: the learner's chosen level
   // caps word length, and the pick is balanced across whichever accent
@@ -79,6 +102,7 @@
   // touching which word is loaded -- used both when loading a brand-new
   // word and before a Retry re-recording.
   function resetAttemptUI() {
+    releaseAttemptAudio();
     els.learnerDiagramRow.hidden = true;
     els.learnerDiagram.innerHTML = '';
     els.contourRow.hidden = true;
@@ -106,6 +130,10 @@
   }
 
   function renderWord(word) {
+    // A reference utterance for the PREVIOUS word may still be speaking (or
+    // queued): speechSynthesis has its own queue, so without this the old
+    // word is spoken over the new one, or after it.
+    ReferenceAudio.cancel();
     currentWord = word;
     els.wordText.textContent = word.word;
     els.wordReading.textContent = word.reading;
@@ -172,6 +200,226 @@
     els.playBtnNote.textContent = noteText;
   }
 
+  // ---- Playback of the learner's own attempt ----
+
+  // One reused <audio> element rather than one per take: a fresh element per
+  // attempt would leak both the element and (on some browsers) its decoder
+  // until GC, and reusing it keeps any user-set volume across attempts.
+  function attemptAudioEl() {
+    if (!attemptAudio) {
+      attemptAudio = new Audio();
+      attemptAudio.preload = 'auto';
+    }
+    return attemptAudio;
+  }
+
+  // Drops whatever recording is currently held. Must run on every path that
+  // ends an attempt (new word, Retry, a fresh Record) -- an object URL is a
+  // reference the browser keeps the whole Blob alive for until it's revoked,
+  // so not revoking here would retain every take of the session.
+  function releaseAttemptAudio() {
+    comparing = false;
+    // Invalidate any recording still being flushed for the attempt being
+    // dropped: Retry doesn't start a new recording (so nothing else bumps
+    // the sequence), and a Blob landing a moment later would otherwise be
+    // offered as playback of an attempt that has just been cleared.
+    attemptSeq++;
+    if (attemptAudio) {
+      try { attemptAudio.pause(); } catch (e) { /* ignore */ }
+      attemptAudio.removeAttribute('src');
+      // Detach the old media resource properly -- without load(), the
+      // element keeps the previous src's decoded state, and the revoked
+      // object URL below can resurface as a stale 'error' on the next play.
+      try { attemptAudio.load(); } catch (e) { /* ignore */ }
+    }
+    if (attemptAudioUrl) {
+      URL.revokeObjectURL(attemptAudioUrl);
+      attemptAudioUrl = null;
+    }
+    els.playbackRow.hidden = true;
+    els.playbackNote.hidden = true;
+    els.playbackNote.textContent = '';
+    setPlaybackButtonsDisabled(false);
+  }
+
+  // Playback can fail two very different ways, and telling them apart is the
+  // difference between "tap again" and "this take is unusable": the browser's
+  // autoplay policy rejects with NotAllowedError when play() wasn't reached
+  // from a user gesture (which is what happens to the second leg of Compare
+  // on stricter settings, since it starts after the reference finishes
+  // speaking), whereas a decode/network failure means the recording itself
+  // is no good.
+  function playbackErrorText(err) {
+    if (err && err.name === 'NotAllowedError') {
+      return 'Your browser blocked playback -- tap "▶ Your voice" to hear your attempt.';
+    }
+    return 'Could not play the recording.';
+  }
+
+  function showPlaybackNote(err) {
+    els.playbackNote.hidden = false;
+    els.playbackNote.textContent = playbackErrorText(err);
+  }
+
+  function setPlaybackButtonsDisabled(disabled) {
+    els.compareBtn.disabled = disabled;
+    els.playAttemptBtn.disabled = disabled;
+  }
+
+  // Called by PitchDetect once the take has been flushed. `seq` is the
+  // attempt this Blob belongs to (see attemptSeq above).
+  function receiveAttemptAudio(blob, seq) {
+    if (seq !== attemptSeq || !blob) return;
+    attemptAudioUrl = URL.createObjectURL(blob);
+    attemptAudioEl().src = attemptAudioUrl;
+    els.playbackRow.hidden = false;
+  }
+
+  // Upper bound on how long a playback is allowed to be considered "still
+  // going". Recording itself is capped at PitchDetect's MAX_DURATION_MS (3s),
+  // so a take can never legitimately outlast this -- and media events are not
+  // dependable enough to wait on unconditionally: on a machine with no
+  // working audio output, play() never settles and neither 'playing' nor
+  // 'ended' ever fires (verified in-browser), which would otherwise leave
+  // Compare's buttons disabled forever with no error shown.
+  var ATTEMPT_PLAY_CAP_MS = 5000;
+
+  // Plays the held recording, resolving when it finishes (or rejecting if
+  // the browser refuses to play it -- notably an autoplay block on the
+  // second leg of Compare, which starts outside the original click gesture).
+  // Also resolves, rather than hanging, once ATTEMPT_PLAY_CAP_MS has passed.
+  function playAttempt() {
+    if (!attemptAudioUrl) return Promise.reject(new Error('No recording to play.'));
+    var audio = attemptAudioEl();
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var capTimer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      }, ATTEMPT_PLAY_CAP_MS);
+      function cleanup() {
+        clearTimeout(capTimer);
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('error', onError);
+      }
+      function onEnded() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      }
+      function onError() {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        // A media-element error (decode failure, revoked URL) -- deliberately
+        // NOT named NotAllowedError, so playbackErrorText() reports it as a
+        // bad recording rather than telling the learner to tap again.
+        reject(new Error('Could not play the recording.'));
+      }
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError);
+      try { audio.currentTime = 0; } catch (e) { /* not yet seekable -- starts at 0 anyway */ }
+      var started = audio.play();
+      if (started && typeof started.catch === 'function') {
+        started.catch(function (err) {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(err);
+        });
+      }
+    });
+  }
+
+  // Reference-then-attempt, back to back with a short gap. The comparison is
+  // the point of playback -- hearing either clip alone tells the learner far
+  // less than hearing the drop land in two different places -- so this, not
+  // the single "Your voice" button, is the primary control.
+  var COMPARE_GAP_MS = 350;
+
+  // Hard cap on how long Compare waits for the reference leg. speechSynthesis
+  // does not reliably fire 'end': a remote (network) voice with no working
+  // audio path can leave speak()'s promise pending forever, which -- since
+  // Compare disables both buttons while it runs -- would leave playback
+  // permanently unusable with no error shown. Verified in-browser: without
+  // this, the buttons never re-enabled. The cap is generous enough for any
+  // single word (the longest entries are 5-6 moras, well under a second of
+  // speech) plus voice-list loading.
+  var REFERENCE_TIMEOUT_MS = 3000;
+
+  // Resolves with `promise`'s result, or with null once `ms` has elapsed --
+  // never rejects, so a caller can use it as a "best-effort, bounded" step.
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        resolve(null);
+      }, ms);
+      promise.then(function (value) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      }, function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      });
+    });
+  }
+
+  function compareWithReference() {
+    if (comparing || !attemptAudioUrl || !currentWord) return;
+    comparing = true;
+    setPlaybackButtonsDisabled(true);
+    els.playbackNote.hidden = true;
+    els.playbackNote.textContent = '';
+
+    var reading = currentWord.reading;
+    // A missing, failed, or silently-hanging reference voice must not swallow
+    // the learner's own playback -- both the .catch and the timeout fall
+    // through to the attempt rather than aborting the compare.
+    var referenceLeg = playPermanentlyUnavailable
+      ? Promise.resolve(null)
+      : withTimeout(
+        ReferenceAudio.readyVoices().then(function () { return ReferenceAudio.speak(reading); }),
+        REFERENCE_TIMEOUT_MS
+      );
+
+    referenceLeg
+      .then(function () {
+        // If the utterance is still going (i.e. the timeout above won the
+        // race), stop it so the two clips don't talk over each other.
+        ReferenceAudio.cancel();
+      })
+      .then(function () {
+        return new Promise(function (resolve) { setTimeout(resolve, COMPARE_GAP_MS); });
+      })
+      .then(playAttempt)
+      .catch(showPlaybackNote)
+      .then(function () {
+        comparing = false;
+        setPlaybackButtonsDisabled(false);
+      });
+  }
+
+  function setupPlayback() {
+    els.playAttemptBtn.addEventListener('click', function () {
+      if (comparing) return;
+      // Stop any reference utterance first, so the two don't overlap into an
+      // unintelligible mush.
+      ReferenceAudio.cancel();
+      playAttempt().catch(showPlaybackNote);
+    });
+    els.compareBtn.addEventListener('click', compareWithReference);
+  }
+
   // ---- Recording / scoring ----
 
   function handleTrace(trace) {
@@ -193,6 +441,27 @@
     // wrong word's pattern.
     var word = recordingWord || currentWord;
     recordingWord = null;
+    // No word loaded at all (only reachable if a recording somehow started
+    // before data/words.json resolved) -- say so rather than throwing inside
+    // moraCountFor(null) and leaving the UI stuck with no explanation.
+    if (!word) {
+      els.detectMessage.hidden = false;
+      els.detectMessage.textContent = 'No word is loaded -- reload the page and try again.';
+      return;
+    }
+    // Captured in a hidden/backgrounded tab: the trace is far too sparse to
+    // mean anything (see recordingWasHidden). Say so instead of drawing a
+    // diagram and a score off a handful of frames. Playback, if it arrives,
+    // stays available -- MediaRecorder is not throttled the way timers are,
+    // so the learner can still hear what was captured.
+    if (recordingWasHidden) {
+      recordingWasHidden = false;
+      els.detectMessage.hidden = false;
+      els.detectMessage.textContent =
+        'This tab was in the background while recording, so the pitch trace is too sparse to score -- keep onchou visible and try again.';
+      return;
+    }
+
     var moraCount = moraCountFor(word);
     var segmented = MoraSegment.segmentByMora(trace, moraCount);
     var learnerPattern = segmented.pattern;
@@ -238,6 +507,11 @@
 
   function startRecordingFlow() {
     resetAttemptUI();
+    // Silence any reference audio before the mic opens -- an utterance still
+    // playing through the speakers is picked up by the microphone and
+    // analyzed as if it were the learner's own voice, which both corrupts
+    // the score and (now that the take is playable) is audible in playback.
+    ReferenceAudio.cancel();
     els.recordBtn.disabled = true;
 
     // Disable Next/Play for the WHOLE recording span, starting synchronously
@@ -248,12 +522,17 @@
     // capture for the old word.
     recordingActive = true;
     recordingWord = currentWord;
+    recordingWasHidden = document.hidden === true;
     els.nextBtn.disabled = true;
     els.playBtn.disabled = true;
 
+    var seq = ++attemptSeq;
     PitchDetect.startRecording({
       onAutoStop: function (trace) {
         handleTrace(trace);
+      },
+      onAudio: function (blob) {
+        receiveAttemptAudio(blob, seq);
       },
     }).then(function () {
       isRecording = true;
@@ -293,6 +572,15 @@
       resetAttemptUI();
     });
 
+    // Switching tabs (or minimizing) mid-take throttles the capture timer --
+    // see recordingWasHidden. Latch it for the whole recording span rather
+    // than only sampling document.hidden at the start and end, since a
+    // learner who tabs away and back would otherwise look like they never
+    // left.
+    document.addEventListener('visibilitychange', function () {
+      if (recordingActive && document.hidden) recordingWasHidden = true;
+    });
+
     els.nextBtn.addEventListener('click', function () {
       // Belt-and-suspenders: the button is already disabled for the whole
       // recordingActive span (see startRecordingFlow/handleTrace), but
@@ -311,6 +599,11 @@
       if (e.repeat || e.code !== 'Space') return;
       var tag = document.activeElement && document.activeElement.tagName;
       if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Not while the settings dialog is open: focus lands on the panel
+      // itself after a backdrop-adjacent click (activeElement === body), so
+      // the tag check above doesn't cover it, and a spacebar there would
+      // start a recording behind the modal.
+      if (!els.settingsOverlay.hidden) return;
       if (els.quiz.hidden || els.recordBtn.disabled) return;
       e.preventDefault();
       els.recordBtn.click();
@@ -478,6 +771,7 @@
     els.recordBtn.disabled = true;
     setupReferenceAudio();
     setupRecording();
+    setupPlayback();
 
     fetch('data/words.json')
       .then(function (res) { return res.json(); })

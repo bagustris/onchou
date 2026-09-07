@@ -1,7 +1,7 @@
 // Node-builtin test runner for reference-audio.js's pure helpers (the live
 // speechSynthesis wrapper is browser-only and untestable here).
 const assert = require('assert');
-const { isJapaneseVoice, pickJapaneseVoice, supported } = require('../reference-audio.js');
+const { isJapaneseVoice, pickJapaneseVoice, supported, cancel } = require('../reference-audio.js');
 
 let pass = 0, fail = 0;
 function eq(name, got, expected) {
@@ -32,6 +32,13 @@ eq('pick: ignores non-japanese voices mixed in', pickJapaneseVoice([{ lang: 'en-
 
 // supported(): just shouldn't throw in Node (no `self`/window)
 eq('supported: false outside a browser', supported(), false);
+
+// cancel() is called unconditionally by app.js on every word change and at
+// the start of every recording, including on browsers with no
+// speechSynthesis at all -- it must be a no-op there, not a throw.
+eq('cancel: no-op (no throw) when speechSynthesis is absent', (function () {
+  try { cancel(); return 'ok'; } catch (e) { return 'threw: ' + e.message; }
+})(), 'ok');
 
 console.log(`reference-audio: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

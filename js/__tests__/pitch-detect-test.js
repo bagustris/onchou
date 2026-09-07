@@ -167,5 +167,46 @@ withGlobals(
   }
 );
 
+// ---- playback tap (MediaRecorder) capability probes ----
+//
+// `root` inside the module is this Node global (captured at require() time),
+// so defining/removing global.MediaRecorder exercises these directly. The
+// recorder wiring itself needs a live MediaStream and can't be reached from
+// Node -- only the two pure probes that gate it are covered here.
+
+eq('no MediaRecorder in Node -> playback unsupported', PitchDetect.playbackSupported(), false);
+eq('no MediaRecorder -> no mime chosen', PitchDetect._pickAudioMime(), null);
+
+function fakeMediaRecorder(supportedTypes) {
+  const MR = function () {};
+  if (supportedTypes !== null) {
+    MR.isTypeSupported = (type) => supportedTypes.indexOf(type) !== -1;
+  }
+  return MR;
+}
+
+withGlobals({ MediaRecorder: fakeMediaRecorder(['audio/webm;codecs=opus', 'audio/webm']) }, () => {
+  eq('MediaRecorder present -> playback supported', PitchDetect.playbackSupported(), true);
+  eq('picks the best-first supported container', PitchDetect._pickAudioMime(), 'audio/webm;codecs=opus');
+});
+
+// Safari's shape: only mp4 is accepted, and it must not be skipped just
+// because the two webm candidates ahead of it fail.
+withGlobals({ MediaRecorder: fakeMediaRecorder(['audio/mp4']) }, () => {
+  eq('falls through to mp4 when webm is unsupported', PitchDetect._pickAudioMime(), 'audio/mp4');
+});
+
+// Nothing on the candidate list is accepted -- null means "let MediaRecorder
+// pick its own default", which is a valid outcome, not a failure.
+withGlobals({ MediaRecorder: fakeMediaRecorder([]) }, () => {
+  eq('no candidate accepted -> null (browser default)', PitchDetect._pickAudioMime(), null);
+});
+
+// An implementation without isTypeSupported at all must not throw.
+withGlobals({ MediaRecorder: fakeMediaRecorder(null) }, () => {
+  eq('no isTypeSupported -> null (browser default)', PitchDetect._pickAudioMime(), null);
+  eq('no isTypeSupported still counts as playback-capable', PitchDetect.playbackSupported(), true);
+});
+
 console.log(`pitch-detect-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

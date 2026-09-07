@@ -57,6 +57,7 @@
     <div class="settings-row settings-row-column settings-about">
       <span class="settings-row-label">このアプリについて<span>About</span></span>
       <p class="about-app">音調 onchou</p>
+      <a class="about-link" href="tutorial/" target="_blank" rel="noopener noreferrer">ピッチアクセント入門<span>Tutorial: how Japanese pitch accent works</span></a>
       <a class="about-link" href="https://github.com/bagustris/onchou" target="_blank" rel="noopener noreferrer">貢献・問題報告<span>Contribute / report an issue on GitHub</span></a>
     </div>
   </div>
@@ -92,6 +93,17 @@
       <div id="learner-diagram-row" class="diagram-row" hidden>
         <span class="diagram-label">Your attempt</span>
         <div id="learner-diagram"></div>
+      </div>
+
+      <!-- Playback of the learner's own take. Revealed by js/app.js only once
+           PitchDetect hands back an audio Blob (which arrives after the
+           trace has already been scored -- MediaRecorder flushes
+           asynchronously), and stays hidden entirely on browsers without
+           MediaRecorder. -->
+      <div id="playback-row" class="playback-row" hidden>
+        <button id="compare-btn" class="secondary-btn" type="button">&#8646; Compare</button>
+        <button id="play-attempt-btn" class="secondary-btn" type="button">&#9654; Your voice</button>
+        <p id="playback-note" class="playback-note" hidden></p>
       </div>
 
       <div id="contour-row" class="diagram-row" hidden>

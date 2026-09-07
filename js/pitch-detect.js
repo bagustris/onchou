@@ -7,11 +7,19 @@
 // setInterval (see "Open items" in the design spec: AnalyserNode polling
 // chosen over AudioWorklet here for simplicity -- no separate worklet module
 // to load or postMessage plumbing to wire up. setInterval rather than
-// requestAnimationFrame specifically because rAF pauses in a backgrounded
-// tab, which would silently truncate a recording if the learner switches
-// away mid-take; setInterval keeps firing regardless of tab visibility).
-// Each poll reads the current time-domain buffer and runs
+// requestAnimationFrame specifically because rAF stops entirely in a
+// backgrounded tab, which would truncate a recording if the learner switches
+// away mid-take). Each poll reads the current time-domain buffer and runs
 // autocorrelation-based F0 estimation on it.
+//
+// Caveat, verified in-browser: setInterval keeps firing in a hidden tab but
+// is THROTTLED to roughly once per second there, so a 3s take captured while
+// the tab is hidden yields ~3 frames instead of ~150 -- enough to segment
+// and score, but the result is meaningless. Nothing here can defeat that
+// throttle (only an AudioWorklet, which runs on the audio thread, would);
+// app.js therefore watches document visibility across the recording span and
+// tells the learner rather than scoring a trace that sparse. Anything that
+// changes HOP_MS or this polling strategy needs to keep that guard honest.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(root);
   else root.PitchDetect = factory(root);
@@ -51,6 +59,51 @@
   var MAX_DURATION_MS = 3000;
 
   var state = null; // set while a recording is in progress; null otherwise
+
+  // Candidate containers for the playback tap, best-first. The F0 analysis
+  // never touches this recording -- it exists only so the learner can hear
+  // their own attempt back -- so any container the browser will actually
+  // produce is fine; we just need one it accepts. Chrome/Firefox take webm/
+  // opus, Safari only mp4/aac.
+  var AUDIO_MIME_CANDIDATES = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+  ];
+
+  // Resolves the MediaRecorder constructor, or null if this browser has
+  // none. Falls back to the bare global the same way unsupportedReason()
+  // does for `navigator`: under CommonJS the UMD wrapper's `root` is
+  // `module.exports`, not the global object, so `root.MediaRecorder` alone
+  // would be permanently undefined in Node and leave these probes
+  // untestable.
+  function mediaRecorderCtor() {
+    if (root && typeof root.MediaRecorder === 'function') return root.MediaRecorder;
+    if (typeof MediaRecorder === 'function') return MediaRecorder;
+    return null;
+  }
+
+  // Whether this browser can hand back a playable recording of the attempt.
+  // Separate from isSupported(): a browser without MediaRecorder can still
+  // do the whole detect-and-score flow, it just can't offer playback, so
+  // this must never gate recording itself.
+  function playbackSupported() {
+    return mediaRecorderCtor() !== null;
+  }
+
+  // Picks the first container this browser admits to supporting, or null to
+  // let MediaRecorder choose its own default (older implementations lack
+  // isTypeSupported entirely).
+  function pickAudioMime() {
+    var MR = mediaRecorderCtor();
+    if (!MR) return null;
+    if (typeof MR.isTypeSupported !== 'function') return null;
+    for (var i = 0; i < AUDIO_MIME_CANDIDATES.length; i++) {
+      if (MR.isTypeSupported(AUDIO_MIME_CANDIDATES[i])) return AUDIO_MIME_CANDIDATES[i];
+    }
+    return null;
+  }
 
   // Distinguishes *why* recording is unavailable, since the two causes need
   // very different user-facing advice: a genuinely old/incapable browser
@@ -167,6 +220,13 @@
   }
 
   // startRecording(opts) -> Promise
+  // opts.onAudio(blobOrNull) is called exactly once per started recording,
+  // after capture has fully stopped, with a playable Blob of what the mic
+  // heard (or null if this browser can't produce one / nothing was
+  // captured). It fires on BOTH the stopRecording() and the auto-stop path,
+  // and always LATER than the trace is handed back -- MediaRecorder only
+  // flushes its final chunk asynchronously on its own 'stop' event, so the
+  // caller must treat playback as arriving after scoring, not with it.
   // opts.onAutoStop(trace) is called if MAX_DURATION_MS elapses before the
   // caller calls stopRecording() -- the caller should treat this exactly
   // like the learner tapping Stop (run mora-segment on the trace, re-enable
@@ -193,6 +253,13 @@
     // state back to null, or a single failed attempt would permanently wedge
     // every future startRecording() call behind 'already-recording'.
     state = { pending: true };
+    // Held in the closure so stopRecording() can cancel an attempt that is
+    // still waiting on the mic-permission prompt: begin() checks this flag
+    // and tears the pipeline down instead of going live. Without it, a stop
+    // during that window left `state` as this placeholder with no teardown
+    // to call, wedging every later startRecording() behind
+    // 'already-recording' until (or unless) getUserMedia resolved.
+    var slot = state;
 
     return root.navigator.mediaDevices.getUserMedia({ audio: true }).then(
       function (stream) {
@@ -205,6 +272,49 @@
 
         var timeDomainBuf = new Float32Array(analyser.fftSize);
         var trace = [];
+
+        // Playback tap: a MediaRecorder on the SAME stream the analyser
+        // reads, so what the learner hears back is exactly the audio that
+        // was scored -- not a second, separately-captured take. Entirely
+        // best-effort: any failure here (no MediaRecorder, a container the
+        // browser accepts then chokes on, a start() throw) must leave the
+        // pitch pipeline untouched, so every call is guarded and the
+        // callback simply reports null.
+        var onAudio = typeof opts.onAudio === 'function' ? opts.onAudio : null;
+        var audioChunks = [];
+        var recorder = null;
+        var audioDelivered = false;
+
+        function deliverAudio(blob) {
+          if (!onAudio || audioDelivered) return;
+          audioDelivered = true;
+          onAudio(blob && blob.size > 0 ? blob : null);
+        }
+
+        var MediaRecorderCtor = mediaRecorderCtor();
+        if (onAudio && MediaRecorderCtor) {
+          try {
+            var mime = pickAudioMime();
+            recorder = mime
+              ? new MediaRecorderCtor(stream, { mimeType: mime })
+              : new MediaRecorderCtor(stream);
+            recorder.ondataavailable = function (e) {
+              if (e.data && e.data.size > 0) audioChunks.push(e.data);
+            };
+            recorder.onstop = function () {
+              deliverAudio(audioChunks.length
+                ? new Blob(audioChunks, { type: recorder.mimeType || (mime || 'audio/webm') })
+                : null);
+            };
+            // A recorder that errors mid-take still owes the caller its one
+            // callback, or app.js would wait forever for playback that is
+            // never coming.
+            recorder.onerror = function () { deliverAudio(null); };
+            recorder.start();
+          } catch (e) {
+            recorder = null;
+          }
+        }
         var startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
         var intervalId = null;
         var stopTimeoutId = null;
@@ -250,6 +360,21 @@
           stopped = true;
           if (intervalId !== null) clearInterval(intervalId);
           if (stopTimeoutId !== null) clearTimeout(stopTimeoutId);
+          // Stop the recorder BEFORE the tracks it reads: killing the tracks
+          // first can end the take without a final flush on some
+          // implementations, losing the last chunk (or all of it, for a very
+          // short attempt). recorder.stop() is asynchronous -- its 'stop'
+          // event is what invokes the caller's onAudio.
+          if (recorder) {
+            try {
+              if (recorder.state !== 'inactive') recorder.stop();
+              else deliverAudio(null);
+            } catch (e) {
+              deliverAudio(null);
+            }
+          } else {
+            deliverAudio(null);
+          }
           stream.getTracks().forEach(function (track) { track.stop(); });
           try { source.disconnect(); } catch (e) { /* ignore */ }
           try { ctx.close(); } catch (e) { /* ignore */ }
@@ -266,6 +391,15 @@
           // the comment above).
           if (stopped) {
             return Promise.reject({ type: 'unknown', message: 'Recording ended before it could start.' });
+          }
+          // Stopped by the caller while the mic prompt / ctx.resume() was
+          // still pending -- tear down rather than going live for a take
+          // nobody is waiting for, and release the slot so the next
+          // startRecording() isn't rejected as 'already-recording'.
+          if (slot.cancelled) {
+            teardown();
+            state = null;
+            return Promise.reject({ type: 'cancelled', message: 'Recording was cancelled before it started.' });
           }
           state = {
             trace: trace,
@@ -318,12 +452,21 @@
   function stopRecording() {
     // `state` can be the synchronous `{pending: true}` placeholder set at
     // the top of startRecording() (before getUserMedia has resolved), which
-    // has neither `.trace` nor `.teardown` -- guard against that, not just
-    // against `state` being null, or this throws. Not reachable through
-    // this app's own UI today (Record/Space are disabled for this whole
-    // window -- see app.js's recordingActive), but stopRecording() is a
-    // public entry point and must not crash if called during it.
-    if (!state || !state.trace) return [];
+    // has neither `.trace` nor `.teardown` -- so this must not just check
+    // for null, or it throws. Not reachable through this app's own UI today
+    // (Record/Space are disabled for this whole window -- see app.js's
+    // recordingActive), but stopRecording() is a public entry point and
+    // must both survive being called during it and not leave the pipeline
+    // running: the `cancelled` flag below is what begin() honors to tear
+    // down a take that was stopped before it went live.
+    if (!state) return [];
+    if (!state.trace) {
+      // The synchronous `{pending: true}` placeholder: no pipeline exists to
+      // tear down yet, so flag it and let begin() do the teardown when
+      // getUserMedia finally resolves.
+      state.cancelled = true;
+      return [];
+    }
     var trace = state.trace.slice();
     state.teardown();
     state = null;
@@ -333,6 +476,7 @@
   return {
     isSupported: isSupported,
     unsupportedReason: unsupportedReason,
+    playbackSupported: playbackSupported,
     startRecording: startRecording,
     stopRecording: stopRecording,
     // Exposed for testing the pure estimator against synthetic signals.
@@ -340,5 +484,6 @@
     _FRAME_SIZE: FRAME_SIZE,
     _HOP_MS: HOP_MS,
     _MAX_DURATION_MS: MAX_DURATION_MS,
+    _pickAudioMime: pickAudioMime,
   };
 });

@@ -650,3 +650,261 @@ button {
 #unsupported-notice-text {
   white-space: pre-line;
 }
+
+/* Playback of the learner's own recording (#playback-row), sitting directly
+   under the learner diagram so the visual reading and the audio it came from
+   are read together. */
+.playback-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.playback-row .secondary-btn {
+  font-size: 0.85rem;
+}
+
+#compare-btn {
+  border-color: var(--accent-learner);
+  color: var(--accent-learner);
+}
+
+.playback-note {
+  flex-basis: 100%;
+  margin: 0.1rem 0 0;
+  font-size: 0.75rem;
+  color: #8a8378;
+}
+
+/* ---------------------------------------------------------------------------
+   Tutorial page (tutorial/index.html)
+   Reuses .card / .app-header / the .pitch-* diagram classes above; only the
+   long-form prose layout is new here.
+   --------------------------------------------------------------------------- */
+
+/* The app header is capped at 480px for the quiz card; the tutorial's prose
+   column is wider, so widen its header to match or the back link and title
+   sit inset from the content below them. */
+.tutorial-page .app-header {
+  max-width: 620px;
+  text-align: left;
+  padding-left: 1rem;
+}
+
+.tutorial-page .app-header h1 {
+  font-size: 1.25rem;
+}
+
+.tutorial-back {
+  position: static;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.tutorial-back:hover,
+.tutorial-back:focus-visible {
+  text-decoration: underline;
+}
+
+.tutorial-subtitle {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #8a8378;
+}
+
+main.tutorial {
+  max-width: 620px;
+  text-align: left;
+}
+
+.tutorial-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.tutorial-toc a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.tutorial-toc a:hover,
+.tutorial-toc a:focus-visible {
+  text-decoration: underline;
+}
+
+.tutorial-section {
+  text-align: left;
+  padding: 1.2rem 1.2rem 1.4rem;
+}
+
+.tutorial-section h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.05rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.tutorial-section h2 span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #8a8378;
+}
+
+.tutorial-section p,
+.tutorial-section li {
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.tutorial-section ul,
+.tutorial-section ol {
+  padding-left: 1.3rem;
+}
+
+.tutorial-section code {
+  font-size: 0.85em;
+  padding: 0.05em 0.3em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.tutorial-en {
+  color: #8a8378;
+  font-size: 0.85em;
+}
+
+.tutorial-examples {
+  padding: 0.7rem 0.9rem;
+  background: var(--bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  line-height: 2;
+}
+
+.tutorial-pattern {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border);
+}
+
+.tutorial-pattern h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.tutorial-pattern h3 span {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #8a8378;
+}
+
+.tutorial-diagram-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0.8rem 0;
+}
+
+.tutorial-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  transform-origin: left top;
+  scale: 1.6;
+  width: fit-content;
+  /* `scale` doesn't affect layout size, so the extra 0.6x of height has to be
+     paid for by margin or the next paragraph rides over the diagram. */
+  margin: 0.6rem 0 1.9rem;
+}
+
+/* On a phone the 1.6x diagrams plus their scaled captions get close to the
+   content width; back off the magnification rather than let them overflow. */
+@media (max-width: 420px) {
+  .tutorial-diagram {
+    scale: 1.3;
+    margin-bottom: 1.4rem;
+  }
+}
+
+.tutorial-diagram-caption {
+  font-size: 0.5rem;
+  color: #8a8378;
+}
+
+/* Inside the minimal-pairs table the diagrams sit in a narrow cell, so they
+   stay unscaled and inline rather than blown up like the section examples. */
+.tutorial-diagram-inline {
+  display: inline-block;
+  scale: 1;
+  margin: 0;
+}
+
+.tutorial-swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.tutorial-swatch-target { background: var(--accent); }
+.tutorial-swatch-learner { background: var(--accent-learner); }
+
+.tutorial-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tutorial-pairs {
+  width: 100%;
+  min-width: 320px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.6rem 0;
+}
+
+.tutorial-pairs th,
+.tutorial-pairs td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tutorial-pairs th {
+  font-size: 0.75rem;
+  color: #8a8378;
+  font-weight: normal;
+}
+
+.tutorial-note {
+  color: #8a8378;
+  font-size: 0.85rem;
+}
+
+.tutorial-source {
+  margin: 1.2rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #8a8378;
+}
+
+.tutorial-source a { color: var(--accent); }
