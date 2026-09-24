@@ -93,6 +93,11 @@ dependency order, each an IIFE-scoped global:
    utterance still playing is picked up by the mic and scored as the
    learner's own voice — so `speak()` resolves (rather than rejects) on the
    `canceled`/`interrupted` error the browser reports for a deliberate stop.
+   Any other `SpeechSynthesisErrorEvent` code is run through
+   `speechErrorMessage()` before it reaches `speak()`'s rejection — a raw
+   spec code like `not-allowed` or `audio-busy` is not learner-facing text,
+   and without this mapping it would surface verbatim under the Play
+   button.
 6. `js/settings.js` (`SettingsManager`) — `localStorage`-backed user
    preferences (`autoPlayReference`, `showContour`, `level`) under the
    `onchou-settings` key, surfaced by the hamburger settings panel ported
@@ -103,8 +108,12 @@ dependency order, each an IIFE-scoped global:
    includes 2-mora words) and balances the draw across whichever accent
    patterns that level makes available, since heiban otherwise dominates
    the pool. Takes an injectable `rng` so the balancing is deterministically
-   testable. Depends on `PitchDiagram` for mora-splitting — note it must be
-   referenced by bare identifier, not `window.PitchDiagram`, because
+   testable, and an optional `exclude` (the word already on screen, compared
+   by identity) so "Next word" can't immediately repeat it — except when
+   `exclude` is the only word left after filtering, since a level whose
+   bucket for some pattern holds exactly one word must still return it
+   rather than fail the draw. Depends on `PitchDiagram` for mora-splitting —
+   note it must be referenced by bare identifier, not `window.PitchDiagram`, because
    `pitch-diagram.js` declares it with `const` (script-scoped binding, not a
    `window` property). See
    `docs/superpowers/specs/2026-09-06-onchou-learning-progression-design.md`.
@@ -123,7 +132,17 @@ dependency order, each an IIFE-scoped global:
    artifact or a too-quiet mora. An `attemptSeq` counter guards the async
    `Blob` arrival: object URLs are revoked and the sequence bumped on every
    word change/Retry/Record, so a late `Blob` can't be offered as playback
-   of an attempt already cleared.
+   of an attempt already cleared. The same `attemptSeq` snapshot also guards
+   Compare/"▶ Your voice" themselves: each click captures the live `seq`,
+   and every step of that async chain (the reference leg, the gap, the
+   attempt playback, its error note, the final re-enable) checks it's still
+   current before touching shared UI, so a Record/Retry that lands mid-chain
+   can't have a stale rejection re-show a "Could not play" note against an
+   attempt that's already been discarded. Also: a mouse click on any quiz
+   button blurs it afterward (`e.detail > 0` distinguishes a pointer click
+   from a keyboard activation, which reports `0`) — without that, the
+   Space-to-record shortcut's own focus guard sees that button still
+   focused and re-activates IT instead of toggling Record.
 
 `tutorial/index.html` is a static prose page (linked from the settings
 About block, served at `/onchou/tutorial`) explaining moras, the accent

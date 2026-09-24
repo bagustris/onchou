@@ -163,6 +163,43 @@ eq('pickWord returns null for an empty word list', pickWord([], 'all', fakeRng([
     true);
 }
 
+// --- pickWord: `exclude` (no-immediate-repeat) --------------------------
+
+{
+  // 2 buckets present (heiban, atamadaka); excluding SAKURA removes heiban
+  // entirely (it was SAKURA's only word), so rng 0.5 * 1 bucket -> the one
+  // remaining bucket (atamadaka) regardless of which index it lands at.
+  const words = [SAKURA, HASHI];
+  eq('pickWord excludes a word whose bucket becomes empty, dropping the bucket',
+    pickWord(words, 'all', fakeRng([0.5, 0]), SAKURA),
+    HASHI);
+}
+
+{
+  // Excluding TAMAGO still leaves other words in its own bucket (nakadaka),
+  // so the bucket survives with just the other one.
+  const tamago2 = { word: '心', reading: 'こころ', accentNum: 2 }; // nakadaka, 3 morae
+  const words = [TAMAGO, tamago2];
+  eq('pickWord excludes just the one word, keeping its bucket alive with the rest',
+    pickWord(words, 'all', fakeRng([0, 0]), TAMAGO),
+    tamago2);
+}
+
+{
+  // The pool is ONLY the excluded word -- filtering it out would leave
+  // nothing to draw from at all, so pickWord must return it anyway rather
+  // than null (a real "no word available" would otherwise fire on every
+  // other "Next word" tap whenever a level's bucket has exactly one word).
+  const words = [SAKURA];
+  eq('pickWord returns the excluded word when it is the only word available',
+    pickWord(words, 'all', fakeRng([0, 0]), SAKURA),
+    SAKURA);
+}
+
+eq('pickWord with no exclude argument behaves exactly as before',
+  pickWord([SAKURA, HASHI], 'all', fakeRng([0, 0]), undefined),
+  SAKURA);
+
 // --- LEVELS -------------------------------------------------------------
 
 eq('LEVELS values, in order', LEVELS.map((l) => l.value), ['2', '3', '4', 'all']);

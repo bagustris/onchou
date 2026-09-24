@@ -85,9 +85,12 @@
   // caps word length, and the pick is balanced across whichever accent
   // patterns that level makes available (heiban otherwise dominates the
   // pool -- see that module's header and the learning-progression design
-  // spec).
+  // spec). `currentWord` is passed as `exclude` so "Next word" can't hand
+  // back the word already on screen -- a real possibility whenever the
+  // chosen level's pool for a pattern is small (a single-word odaka bucket
+  // at level "2" would otherwise repeat on every other draw).
   function pickNextWord() {
-    return WordSelect.pickWord(words, SettingsManager.get('level'));
+    return WordSelect.pickWord(words, SettingsManager.get('level'), null, currentWord);
   }
 
   function moraCountFor(word) {
@@ -374,9 +377,20 @@
     });
   }
 
+  // `seq` snapshots attemptSeq at the moment Compare was clicked. Record,
+  // Retry, and a fresh word change all bump attemptSeq (via
+  // releaseAttemptAudio) and already reset `comparing`/the playback buttons
+  // themselves -- so every continuation below bails out once `seq` no
+  // longer matches the live attempt, instead of a stale chain (started
+  // against an attempt that's since been discarded) re-hiding/re-showing
+  // playback UI that now belongs to a different, unrelated attempt. Without
+  // this guard, clicking Record while Compare is still speaking lets the
+  // old chain's rejected playAttempt() surface a "Could not play the
+  // recording" note against the row for the NEW attempt.
   function compareWithReference() {
     if (comparing || !attemptAudioUrl || !currentWord) return;
     comparing = true;
+    var seq = attemptSeq;
     setPlaybackButtonsDisabled(true);
     els.playbackNote.hidden = true;
     els.playbackNote.textContent = '';
@@ -394,16 +408,25 @@
 
     referenceLeg
       .then(function () {
+        if (seq !== attemptSeq) return;
         // If the utterance is still going (i.e. the timeout above won the
         // race), stop it so the two clips don't talk over each other.
         ReferenceAudio.cancel();
       })
       .then(function () {
+        if (seq !== attemptSeq) return;
         return new Promise(function (resolve) { setTimeout(resolve, COMPARE_GAP_MS); });
       })
-      .then(playAttempt)
-      .catch(showPlaybackNote)
       .then(function () {
+        if (seq !== attemptSeq) return;
+        return playAttempt();
+      })
+      .catch(function (err) {
+        if (seq !== attemptSeq) return;
+        showPlaybackNote(err);
+      })
+      .then(function () {
+        if (seq !== attemptSeq) return;
         comparing = false;
         setPlaybackButtonsDisabled(false);
       });
@@ -415,7 +438,16 @@
       // Stop any reference utterance first, so the two don't overlap into an
       // unintelligible mush.
       ReferenceAudio.cancel();
-      playAttempt().catch(showPlaybackNote);
+      // Same staleness guard as compareWithReference(): a Record/Retry that
+      // lands while this play() is still pending already resets the
+      // playback row itself, so a rejection arriving afterward (e.g.
+      // pause()-during-load producing an AbortError) must not re-show a
+      // note against an attempt that's no longer on screen.
+      var seq = attemptSeq;
+      playAttempt().catch(function (err) {
+        if (seq !== attemptSeq) return;
+        showPlaybackNote(err);
+      });
     });
     els.compareBtn.addEventListener('click', compareWithReference);
   }
@@ -588,6 +620,21 @@
       // blocking the click.
       if (recordingActive) return;
       nextWord();
+    });
+
+    // A mouse/touch click on ANY quiz button (Next, Retry, Play, Compare...)
+    // leaves that button focused afterward. Without this, the very next
+    // Space press activates that focused button instead of reaching the
+    // shortcut below (the keydown handler intentionally bails out whenever
+    // focus is on a button -- see its own comment), so tapping "Next word"
+    // and then hitting Space to record instead silently skips another word.
+    // Blurring after a POINTER-originated click (e.detail > 0; a keyboard
+    // activation of a button reports e.detail === 0) restores the
+    // shortcut without touching keyboard users, who never needed this.
+    els.quiz.addEventListener('click', function (e) {
+      if (e.detail === 0) return;
+      var btn = e.target.closest && e.target.closest('button');
+      if (btn) btn.blur();
     });
 
     // Spacebar toggles Record/Stop from anywhere on the page, so the

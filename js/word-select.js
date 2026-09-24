@@ -103,7 +103,7 @@
     return i;
   }
 
-  // pickWord(words, levelValue, rng) -> word | null
+  // pickWord(words, levelValue, rng, exclude) -> word | null
   //
   // Picks the PATTERN first and the word second -- that ordering is the
   // whole balancing mechanism, since it makes each available pattern
@@ -111,9 +111,36 @@
   // level leaves nothing to draw from (empty list, or every word filtered
   // out), mirroring what the plain random pick this replaced did for an
   // empty list.
-  function pickWord(words, levelValue, rng) {
+  //
+  // `exclude` (optional, compared by identity): a word to avoid picking
+  // again immediately, e.g. the word already on screen -- without this,
+  // the balancing above still lets the SAME word come up twice in a row
+  // whenever its pattern/level combination has few entries (an odaka
+  // level-2 pool can be a single word), which reads as the app being
+  // broken rather than as expected randomness. It's applied by filtering
+  // `exclude` out of every bucket before the two random draws, but only
+  // when that filtering leaves at least one word anywhere -- a pool that
+  // consists of nothing but `exclude` itself must still return it rather
+  // than fail the whole draw (that would turn "only one word available at
+  // this level" into a dead "no words available" state on every other
+  // call).
+  function pickWord(words, levelValue, rng, exclude) {
     var random = rng || Math.random;
     var buckets = groupByPattern(words, maxMoraFor(levelValue));
+
+    if (exclude) {
+      var withoutExclude = {};
+      var anyLeft = false;
+      Object.keys(buckets).forEach(function (pattern) {
+        var filtered = buckets[pattern].filter(function (w) { return w !== exclude; });
+        if (filtered.length) {
+          withoutExclude[pattern] = filtered;
+          anyLeft = true;
+        }
+      });
+      if (anyLeft) buckets = withoutExclude;
+    }
+
     var keys = PATTERN_ORDER.filter(function (pattern) { return buckets[pattern]; });
     if (!keys.length) return null;
 

@@ -1,7 +1,7 @@
 // Node-builtin test runner for reference-audio.js's pure helpers (the live
 // speechSynthesis wrapper is browser-only and untestable here).
 const assert = require('assert');
-const { isJapaneseVoice, pickJapaneseVoice, supported, cancel } = require('../reference-audio.js');
+const { isJapaneseVoice, pickJapaneseVoice, supported, cancel, speechErrorMessage } = require('../reference-audio.js');
 
 let pass = 0, fail = 0;
 function eq(name, got, expected) {
@@ -39,6 +39,17 @@ eq('supported: false outside a browser', supported(), false);
 eq('cancel: no-op (no throw) when speechSynthesis is absent', (function () {
   try { cancel(); return 'ok'; } catch (e) { return 'threw: ' + e.message; }
 })(), 'ok');
+
+// speechErrorMessage: known SpeechSynthesisErrorEvent codes must map to
+// learner-facing text, never leak the raw spec string verbatim.
+eq('speechErrorMessage: known code "not-allowed" is humanized',
+  speechErrorMessage('not-allowed') !== 'not-allowed', true);
+eq('speechErrorMessage: known code "network" is humanized',
+  speechErrorMessage('network') !== 'network', true);
+eq('speechErrorMessage: unknown code falls back to a generic message',
+  speechErrorMessage('some-future-error-code'), 'Could not play the reference audio.');
+eq('speechErrorMessage: undefined falls back to the same generic message',
+  speechErrorMessage(undefined), 'Could not play the reference audio.');
 
 console.log(`reference-audio: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

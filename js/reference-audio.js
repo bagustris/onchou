@@ -40,6 +40,30 @@
     return local || candidates[0];
   }
 
+  // Maps a SpeechSynthesisUtterance error's `.error` code to learner-facing
+  // text. Without this, speak()'s rejection (see below) surfaces the raw
+  // spec code -- 'not-allowed', 'audio-busy', etc. -- verbatim under the
+  // Play button, which reads as a bug report, not a message aimed at
+  // someone practicing Japanese. Pure and exported so it's Node-testable
+  // like this module's other helpers; 'canceled'/'interrupted' are handled
+  // separately by the caller (they aren't failures, so they never reach
+  // this map -- see speak() below).
+  var ERROR_MESSAGES = {
+    'not-allowed': 'Playback wasn’t allowed yet — tap ▶ Play again.',
+    'audio-busy': 'The audio output is busy — try again in a moment.',
+    'audio-hardware': 'No audio output device was found.',
+    'network': 'A network error interrupted the reference voice.',
+    'synthesis-unavailable': 'This voice is unavailable right now.',
+    'synthesis-failed': 'Could not synthesize the reference audio.',
+    'language-unavailable': 'No voice for this language is available.',
+    'voice-unavailable': 'This voice is unavailable right now.',
+    'text-too-long': 'The text was too long to speak.',
+    'invalid-argument': 'Could not play the reference audio.',
+  };
+  function speechErrorMessage(reason) {
+    return ERROR_MESSAGES[reason] || 'Could not play the reference audio.';
+  }
+
   function hasJapaneseVoice() {
     if (!supported()) return false;
     return pickJapaneseVoice(self.speechSynthesis.getVoices()) !== null;
@@ -100,7 +124,7 @@
         // note under the Play button.
         const reason = e && e.error;
         if (reason === 'canceled' || reason === 'interrupted') return resolve();
-        reject(reason ? new Error(reason) : e);
+        reject(new Error(speechErrorMessage(reason)));
       };
       // A fresh utterance per call (never reused) -- SpeechSynthesisUtterance
       // instances are single-use in every implementation.
@@ -118,5 +142,8 @@
     try { self.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
   }
 
-  return { supported, hasJapaneseVoice, readyVoices, speak, cancel, isJapaneseVoice, pickJapaneseVoice };
+  return {
+    supported, hasJapaneseVoice, readyVoices, speak, cancel,
+    isJapaneseVoice, pickJapaneseVoice, speechErrorMessage,
+  };
 });
