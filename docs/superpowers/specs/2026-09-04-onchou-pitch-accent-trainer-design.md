@@ -157,6 +157,132 @@ listening aid, not the ground truth.
 - Output: `{pattern: ['H'|'L'|'unclear', ...]}` for the learner's attempt,
   same shape `pitchLevels()` produces for the target.
 
+### 2026-09-24 addendum: H/L rule changed from a population-median threshold to a 2-cluster split
+
+A synthetic-audio validation experiment (`tools/pitch-accuracy-experiment.js`,
+run offline, not part of the shipped app) found that the rule above —
+comparing each mora's median Hz to the recording's own overall median — is
+structurally unable to avoid exact ties whenever one H/L class is a
+plurality of the word's morae: the population median then lands exactly ON
+that class's own value, tying every one of its slots against the very
+threshold it's compared to. Atamadaka (H,L,L — two of three morae L) came
+back `['H','H','H']` from a perfect, noiseless synthetic trace. No choice of
+tie-breaking direction (nor routing exact ties to `'unclear'`, tried and
+measured first) fixes this without instead breaking whichever *other*
+pattern makes the opposite class the majority — heiban, this app's single
+largest accent class (~47% of `data/words.json`), is H-majority and hit the
+same failure mode from the other side.
+
+`segmentByMora` now classifies each word's own per-mora medians (in log2 Hz)
+as a 1D two-cluster problem instead: try every possible split point across
+the sorted values and keep whichever minimizes total within-group
+sum-of-squared deviations (1D 2-means / Otsu thresholding), rather than
+testing each slot against a single population-wide number. The split
+boundary is a computed midpoint between clusters, not one of the observed
+values, so it can't coincide with either class by construction — unless
+there's no contrast to find at all (every present slot the same value,
+including every 1-mora word, which only ever has one slot), which correctly
+stays `'unclear'` rather than guessing.
+
+Measured on synthetic audio across all 33 `(moraCount, accentNum)` strata
+actually present in `data/words.json`, 25 seeds each, weighted by real word
+frequency, using a wide, roughly-fixed test gap (150Hz/100Hz, ~700 cents —
+this experiment's own synthetic parameter, NOT a measurement of what real
+learners' pitch actually does): exact-word-match rose from 35–85% (85% for
+odaka, 35–47% for the other three classes) to 97–100% across every accent
+class, and — unlike the old rule, whose accuracy degraded further under
+added declination or per-mora jitter — held flat at ~99% across every
+noise/declination condition tested at that gap size. `overallMedian` in
+`segmentByMora`'s return value is unchanged (still the raw population
+median): `js/pitch-contour.js` depends on that exact value to normalize the
+learner's raw trace for its contour rendering, and this change only touches
+the H/L decision, not that contract.
+
+That first measurement's gap is wide and roughly fixed across conditions — a
+"ceiling" case that doesn't say how the new rule holds up as the genuine
+accent contrast gets *smaller*, e.g. a soft-spoken or careful learner whose
+pitch doesn't swing as far as scripted audio does. A follow-up sweep varied
+the H/L ratio itself (1.05 to 1.3, i.e. ~84 to ~455 cents) crossed with
+declination (0, -5%, -10%), using oracle traces (`_estimatePitch` was
+already validated separately) directly against `segmentByMora`'s exported
+`_classifyLevels`:
+
+| H/L ratio | declination | OLD exact% | NEW exact% |
+|---|---|---|---|
+| 1.05 (~84¢) | 0 / -5% / -10% | 56 / 39 / 14 | 35 / 19 / 16 |
+| 1.1 (~165¢) | 0 / -5% / -10% | 56 / 51 / 36 | 99 / 83 / 36 |
+| 1.2 (~316¢) | 0 / -5% / -10% | 56 / 50 / 44 | 99 / 99 / 99 |
+| 1.3 (~455¢) | 0 / -5% / -10% | 58 / 50 / 45 | 99 / 99 / 99 |
+
+NEW is essentially unchanged from the 150Hz/100Hz ceiling result once the
+ratio reaches 1.2, and clearly better than OLD at 1.1 except under the most
+severe combined stress (heavy declination on top of an already-subtle
+contrast). At 1.05 — a contrast weak enough that even a perfect, noiseless
+signal barely clears the noise floor any per-mora-median method has to work
+with — NEW is *worse* than OLD; this is an accepted, disclosed loss (see
+`MIN_SPLIT_CENTS` below), not an oversight.
+
+**A second, distinct risk surfaced by that same follow-up work:** a 2-cluster
+split, unlike a population-median comparison, always finds *some* division
+of the data — even a recording with no real H/L contrast at all (a flat
+attempt, or pure mic noise) gets partitioned into two groups, just a weak
+one. This is most severe for a 2-mora word: with only two slots, the result
+can only ever be `LH` or `HL`, and *every* 2-mora accent target in
+`data/words.json` (291 of the level-"2" pool) is one of exactly those two
+shapes — so a flat, no-accent attempt isn't a rare fluke away from an exact
+match, it's close to a coin flip. Measured directly, using the SAME per-mora
+(2%) + per-frame (1%) jitter model as the ratio sweep above (not an easier
+noise floor than those real-contrast numbers): a genuinely flat trace (no
+declination) scored a false "exact match" 3–52% of the time under the old
+rule, across every mora count (2/3/4) and every target shape tested, and an
+early, unguarded version of the new rule inherited that unchanged.
+
+Fix: `classifyLevels` now computes the winning split's high/low gap in cents
+and, below `MIN_SPLIT_CENTS` (100, picked from this same measurement — see
+the comment above `classifyLevels` in `js/mora-segment.js`), reports every
+present slot `'unclear'` instead of asserting a pattern that's plausibly
+just noise. Effect at the genuine no-contrast condition (no declination):
+false-exact-match fell to **0.0%** at every mora count and target shape
+tested, while the ratio-sweep table above confirms a gap of 1.2 and up
+(~316 cents) is essentially unaffected.
+
+That same measurement, with declination added to the otherwise-flat trace,
+surfaces a separate, pre-existing ambiguity worth naming plainly rather than
+averaging away: a genuinely *declining* trend (not noise — a real, monotonic
+drop across the recording) reads a lot like atamadaka's H-then-sustained-L
+shape to any method working from per-mora medians alone. At -10%
+declination scored specifically against an atamadaka target, the new rule's
+false-positive rate is measurably *higher* than the old rule's at 3 morae
+(28% vs 18%) and 4 morae (18% vs 1%) — though still much lower at 2 morae
+(41% vs 100%), and lower than the old rule for every OTHER target shape
+(heiban/nakadaka/odaka) at the same declination. This is not something
+`MIN_SPLIT_CENTS` can fix by being tuned higher or lower: declination is a
+genuine trend, not noise a stricter threshold filters out. It's a real
+limitation of the time-proportional/no-forced-alignment approach itself (see
+this file's "Method" note above), inherited by whichever H/L rule sits on
+top of it.
+
+`MIN_SPLIT_CENTS` was tuned entirely against synthetic audio and would
+benefit from recalibration once real recorded takes are available (see the
+"Caveat" below and `docs/2026-09-05-pitch-accent-evaluation-research-plan.md`).
+
+**Downstream UI fix required by this same change:** `js/app.js`'s
+`handleTrace` previously showed "Couldn't detect your voice clearly" for any
+recording whose pattern came out all-`'unclear'`. Once a 1-mora word (which
+always has no internal contrast to find) or a genuinely flat/careful attempt
+can legitimately reach that same all-`'unclear'` state despite the mic
+working fine, that message became actively wrong. `handleTrace` now checks
+`segmented.spanStart == null` (literally zero voiced frames) for the
+mic-failure message, and shows a distinct, accurate message — "single mora,
+no relative pitch to compare, use ⇄ Compare instead" for a 1-mora word, "no
+clear high/low difference detected, try exaggerating the pitch swing" for a
+multi-mora take with nothing scoreable — rather than either dead-ending or
+showing a misleadingly bad "0 of N matched" score.
+
+Caveat: all measurement here is synthetic audio (additive harmonic stacks +
+Gaussian noise), not recorded human speech — it validates the pipeline's
+logic under known-ground-truth conditions, not real-speech accuracy.
+
 ### Scoring
 
 Per-mora comparison of the learner's pattern against the target pattern from

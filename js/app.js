@@ -498,11 +498,36 @@
     var segmented = MoraSegment.segmentByMora(trace, moraCount);
     var learnerPattern = segmented.pattern;
 
+    // spanStart is null only when there were literally zero voiced frames --
+    // silence, a muted mic, or a doomed take. Deliberately NOT "every mora
+    // in the pattern came out unclear" (see the allUnclear branch right
+    // below for that case) -- a take with voiced frames but no scoreable
+    // pattern is a different situation with a different message.
+    if (segmented.spanStart == null) {
+      els.detectMessage.hidden = false;
+      els.detectMessage.textContent = "Couldn't detect your voice clearly -- try again.";
+      return;
+    }
+
+    // Voice WAS detected (spanStart above is non-null), but mora-segment.js
+    // found nothing scoreable: either moraCount is 1 (a single mora has no
+    // OTHER mora to be relatively higher/lower than -- always 'unclear', no
+    // matter how well the mic captured it), or every mora's own pitch
+    // contrast came out too small to trust (see classifyLevels'
+    // MIN_SPLIT_CENTS -- a flat/careful attempt can legitimately have no
+    // detectable H/L swing). Either way, "0 of N matched" would read as a
+    // failed attempt when nothing was actually wrong with the recording, so
+    // this shows an accurate explanation instead of a diagram/score built
+    // from an all-'unclear' pattern. Playback (Compare / "Your voice") is
+    // unaffected -- it's wired to the recording's own onAudio callback in
+    // startRecording(), entirely independent of this scoring path.
     var allUnclear = learnerPattern.length > 0 &&
       learnerPattern.every(function (p) { return p === 'unclear'; });
     if (allUnclear) {
       els.detectMessage.hidden = false;
-      els.detectMessage.textContent = "Couldn't detect your voice clearly -- try again.";
+      els.detectMessage.textContent = moraCount === 1
+        ? "This word is a single mora, so there's no relative pitch to compare -- use ⇄ Compare to check it by ear."
+        : 'No clear high/low difference detected in your pitch -- try exaggerating the rise and fall and record again.';
       return;
     }
 

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { segmentByMora, scorePattern } = require('../mora-segment.js');
+const { segmentByMora, scorePattern, _classifyLevels: classifyLevels } = require('../mora-segment.js');
 
 let pass = 0, fail = 0;
 function eq(desc, got, expected) {
@@ -79,6 +79,99 @@ function eq(desc, got, expected) {
   ];
   const { pattern } = segmentByMora(trace, 3);
   eq('high-pitched-overall speaker: relative H/L still correct', pattern, ['H', 'L', 'H']);
+}
+
+// -- classifyLevels: 2-cluster split, direct unit tests -----------------
+
+{
+  // Two well-separated clusters, interleaved order -- split must group by
+  // value, not by position.
+  eq('two clean clusters split correctly regardless of order', classifyLevels([200, 100, 180, 90]), ['H', 'L', 'H', 'L']);
+}
+{
+  // Every present slot the same value: no contrast to find, not a guess.
+  eq('all-identical slot medians: no contrast -> all unclear', classifyLevels([150, 150, 150]), ['unclear', 'unclear', 'unclear']);
+}
+{
+  // A null (no-voiced-frames) slot stays unclear; the other two still split.
+  eq('null slot stays unclear; remaining two still classified', classifyLevels([150, null, 100]), ['H', 'unclear', 'L']);
+}
+{
+  // Only one slot has data at all -- nothing to compare it against.
+  eq('single present value has no basis for H/L -> unclear', classifyLevels([150]), ['unclear']);
+}
+{
+  eq('empty input -> empty output', classifyLevels([]), []);
+}
+
+// -- MIN_SPLIT_CENTS: a 2-cluster split always finds SOME division, even
+// when the "contrast" is too small to trust -- e.g. a flat/monotone
+// attempt where the only variation is noise. Found the same way as the
+// median-tie bug: tools/pitch-accuracy-experiment.js's Stage 5 measured a
+// 2-mora word (where the split can only ever be LH or HL, and every 2-mora
+// accent target IS one of those two shapes) as a near coin-flip false
+// "correct" against pure noise before this guard existed. 100 cents was
+// picked as comfortably above the gap noise alone produces and comfortably
+// below a real accent contrast (H/L ratio 1.2+, ~316 cents) -- see the
+// MIN_SPLIT_CENTS comment above classifyLevels for the full measurement. ---
+
+{
+  // ~60 cents apart (2^(60/1200) ratio) -- below the floor: two genuinely
+  // different values, but too close to trust as a real H/L contrast.
+  const values = [100, 100 * Math.pow(2, 60 / 1200)];
+  eq('gap below MIN_SPLIT_CENTS: too weak to trust, stays unclear', classifyLevels(values), ['unclear', 'unclear']);
+}
+{
+  // ~150 cents apart -- above the floor: a real, if modest, contrast.
+  const values = [100, 100 * Math.pow(2, 150 / 1200)];
+  eq('gap above MIN_SPLIT_CENTS: classified normally', classifyLevels(values), ['L', 'H']);
+}
+
+// -- The bug this replaced: a plurality class ties the OLD "vs. population
+// median" rule's own threshold, and no tie-breaking direction (nor routing
+// ties to 'unclear') fixes it without instead breaking whichever pattern
+// makes the opposite class the majority. Found via a synthetic-audio
+// validation experiment (tools/pitch-accuracy-experiment.js): a perfect,
+// noiseless oracle trace of an atamadaka-shaped (H,L,L) word came back
+// ['H','H','H'] under the old rule. The 2-cluster split has no such
+// asymmetry -- its boundary is a computed midpoint, not one of the observed
+// values -- so it gets both an L-majority and an H-majority word right. -----
+
+{
+  // atamadaka-shaped: two of three morae are L. Old rule: population median
+  // of [150,150,100,100,100,100] is exactly 100 (the L value) -- every L
+  // slot ties it and comes out 'H'. New rule splits on value, not position.
+  const trace = [
+    { tMs: 0, hz: 150 }, { tMs: 20, hz: 150 },   // slot 0: H
+    { tMs: 110, hz: 100 }, { tMs: 130, hz: 100 }, // slot 1: L
+    { tMs: 220, hz: 100 }, { tMs: 240, hz: 100 }, // slot 2: L
+  ];
+  const { pattern, overallMedian } = segmentByMora(trace, 3);
+  eq('overallMedian is still the raw population median (pitch-contour.js contract, unchanged)', overallMedian, 100);
+  eq('L-majority (atamadaka-shaped) word: L morae no longer misread as H', pattern, ['H', 'L', 'L']);
+}
+
+// Symmetric case: an H-majority pattern (two of three morae H).
+{
+  const trace = [
+    { tMs: 0, hz: 150 }, { tMs: 20, hz: 150 },
+    { tMs: 110, hz: 150 }, { tMs: 130, hz: 150 },
+    { tMs: 220, hz: 100 }, { tMs: 240, hz: 100 },
+  ];
+  const { pattern, overallMedian } = segmentByMora(trace, 3);
+  eq('overallMedian is still the raw population median (pitch-contour.js contract, unchanged)', overallMedian, 150);
+  eq('H-majority word: H morae correctly classified', pattern, ['H', 'H', 'L']);
+}
+
+// A 1-mora word has only one slot, with nothing to compare it against -- the
+// old rule always reported 'H' regardless of the recording (a 1-mora heiban
+// target is 'L', so the learner could never be scored correct no matter
+// what they said). Correctly 'unclear' now: there's no relative contrast a
+// single mora can carry.
+{
+  const trace = [{ tMs: 0, hz: 120 }, { tMs: 20, hz: 122 }, { tMs: 40, hz: 118 }];
+  const { pattern } = segmentByMora(trace, 1);
+  eq('1-mora word: no possible internal contrast -> unclear, not a guessed H', pattern, ['unclear']);
 }
 
 // -- scorePattern: match / mismatch / unclear categorization -----------

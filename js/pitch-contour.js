@@ -20,11 +20,12 @@
   //
   // trace: [{tMs, hz|null}, ...] -- raw pitch-detect output, in time order.
   // overallMedian: the recording's own overall voiced median Hz (same value
-  // js/mora-segment.js's segmentByMora already computes and now returns),
-  // used to convert each frame's Hz to a pitch RELATIVE to this speaker's
-  // own recording -- never to absolute Hz or the target pattern, matching
-  // the same speaker-independence principle segmentByMora's H/L conversion
-  // already relies on.
+  // js/mora-segment.js's segmentByMora already computes and returns -- NOT
+  // the value its H/L decision is based on; that's a separate per-word
+  // 2-cluster split, see segmentByMora's classifyLevels()), used to convert
+  // each frame's Hz to a pitch RELATIVE to this speaker's own recording --
+  // never to absolute Hz or the target pattern, the same speaker-
+  // independence principle segmentByMora's own H/L conversion relies on.
   //
   // Each frame's y is log2(hz / overallMedian) -- a ratio in octaves, so
   // it's symmetric regardless of the speaker's absolute pitch -- clamped to
