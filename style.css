@@ -567,6 +567,16 @@ button {
   margin: 0 0 1rem;
 }
 
+/* "＋ が" suffix shown next to the reading in particle mode (js/app.js's
+   particleModeForWord) -- marks が as added-on, not part of the word's own
+   reading, so it's visually distinct from .word-reading above it. */
+.word-card .word-reading-particle {
+  display: block;
+  font-size: 1rem;
+  color: var(--accent);
+  margin: -0.7rem 0 1rem;
+}
+
 .diagram-row {
   display: flex;
   flex-direction: column;

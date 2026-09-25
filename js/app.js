@@ -11,6 +11,7 @@
     quiz: document.getElementById('quiz'),
     wordText: document.getElementById('word-text'),
     wordReading: document.getElementById('word-reading'),
+    wordReadingParticle: document.getElementById('word-reading-particle'),
     targetDiagram: document.getElementById('target-diagram'),
     playBtn: document.getElementById('play-btn'),
     playBtnNote: document.getElementById('play-btn-note'),
@@ -36,6 +37,7 @@
     settingsPanel: document.getElementById('settings-panel'),
     settingAutoPlay: document.getElementById('setting-auto-play'),
     settingShowContour: document.getElementById('setting-show-contour'),
+    settingParticleMode: document.getElementById('setting-particle-mode'),
     settingLevelButtons: Array.prototype.slice.call(
       document.querySelectorAll('#setting-level .segmented-btn')
     ),
@@ -43,8 +45,20 @@
     installHint: document.getElementById('settings-install-hint'),
   };
 
+  // The conventional citation particle for pitch-accent practice (NHK accent
+  // dictionary / OJAD convention) -- see the particle-mode design spec for
+  // why が and no alternative is offered.
+  var PARTICLE_MORA = 'が';
+
   var words = [];
   var currentWord = null;
+  // Snapshotted from SettingsManager.get('particleMode') in renderWord(), not
+  // re-read live elsewhere -- so the "＋ が" suffix shown on the card and
+  // what handleTrace() actually scores can never disagree for a single word
+  // on screen, even if the learner toggles the setting mid-card. Same
+  // "settings changes apply from the next word" convention `level` and
+  // `autoPlayReference` already follow.
+  var particleModeForWord = false;
   var isRecording = false;
   // recordingActive covers the FULL span from clicking Record until
   // handleTrace() finishes processing -- including the async window where
@@ -138,8 +152,10 @@
     // word is spoken over the new one, or after it.
     ReferenceAudio.cancel();
     currentWord = word;
+    particleModeForWord = SettingsManager.get('particleMode');
     els.wordText.textContent = word.word;
     els.wordReading.textContent = word.reading;
+    els.wordReadingParticle.hidden = !particleModeForWord;
     var levels = targetLevelsFor(word);
     els.targetDiagram.innerHTML = PitchDiagram.renderSVG(levels, { variant: 'target' });
     resetAttemptUI();
@@ -186,7 +202,7 @@
   // could end up speaking the wrong word.
   function playReference() {
     if (!currentWord) return;
-    var reading = currentWord.reading;
+    var reading = currentWord.reading + (particleModeForWord ? PARTICLE_MORA : '');
     ReferenceAudio.readyVoices().then(function () {
       return ReferenceAudio.speak(reading);
     }).catch(function (err) {
@@ -395,7 +411,7 @@
     els.playbackNote.hidden = true;
     els.playbackNote.textContent = '';
 
-    var reading = currentWord.reading;
+    var reading = currentWord.reading + (particleModeForWord ? PARTICLE_MORA : '');
     // A missing, failed, or silently-hanging reference voice must not swallow
     // the learner's own playback -- both the .catch and the timeout fall
     // through to the attempt rather than aborting the compare.
@@ -495,7 +511,17 @@
     }
 
     var moraCount = moraCountFor(word);
-    var segmented = MoraSegment.segmentByMora(trace, moraCount);
+    // In particle mode the learner said the word PLUS が, so the recording
+    // has one more real mora to segment/score than the word itself has --
+    // see the particle-mode design spec's "Key existing fact" section for
+    // why the target side needs no equivalent change.
+    var scoringMoraCount = particleModeForWord ? moraCount + 1 : moraCount;
+    // The morae let segmentByMora tell a heavy first syllable (きんえん,
+    // びょういん), which natives say without the usual initial rise, from a
+    // light one -- see heavyInitial in js/mora-segment.js.
+    var morae = PitchDiagram.moraSplit(word.reading);
+    if (particleModeForWord) morae = morae.concat([PARTICLE_MORA]);
+    var segmented = MoraSegment.segmentByMora(trace, scoringMoraCount, { morae: morae });
     var learnerPattern = segmented.pattern;
 
     // spanStart is null only when there were literally zero voiced frames --
@@ -510,52 +536,81 @@
     }
 
     // Voice WAS detected (spanStart above is non-null), but mora-segment.js
-    // found nothing scoreable: either moraCount is 1 (a single mora has no
-    // OTHER mora to be relatively higher/lower than -- always 'unclear', no
-    // matter how well the mic captured it), or every mora's own pitch
-    // contrast came out too small to trust (see classifyLevels'
-    // MIN_SPLIT_CENTS -- a flat/careful attempt can legitimately have no
-    // detectable H/L swing). Either way, "0 of N matched" would read as a
-    // failed attempt when nothing was actually wrong with the recording, so
-    // this shows an accurate explanation instead of a diagram/score built
-    // from an all-'unclear' pattern. Playback (Compare / "Your voice") is
-    // unaffected -- it's wired to the recording's own onAudio callback in
-    // startRecording(), entirely independent of this scoring path.
+    // found nothing scoreable: either scoringMoraCount is 1 (a single mora
+    // has no OTHER mora to be relatively higher/lower than -- always
+    // 'unclear', no matter how well the mic captured it; particle mode
+    // always makes this at least 2, since a word plus が is never a single
+    // mora), or every mora's own pitch contrast came out too small to trust
+    // (see classifyLevels' MIN_SPLIT_CENTS -- a flat/careful attempt can
+    // legitimately have no detectable H/L swing). Either way, "0 of N
+    // matched" would read as a failed attempt when nothing was actually
+    // wrong with the recording, so this shows an accurate explanation
+    // instead of a diagram/score built from an all-'unclear' pattern.
+    // Playback (Compare / "Your voice") is unaffected -- it's wired to the
+    // recording's own onAudio callback in startRecording(), entirely
+    // independent of this scoring path.
     var allUnclear = learnerPattern.length > 0 &&
       learnerPattern.every(function (p) { return p === 'unclear'; });
     if (allUnclear) {
       els.detectMessage.hidden = false;
-      els.detectMessage.textContent = moraCount === 1
+      els.detectMessage.textContent = scoringMoraCount === 1
         ? "This word is a single mora, so there's no relative pitch to compare -- use ⇄ Compare to check it by ear."
         : 'No clear high/low difference detected in your pitch -- try exaggerating the rise and fall and record again.';
       return;
     }
 
     var fullTargetLevels = targetLevelsFor(word);
-    var targetPattern = fullTargetLevels.slice(0, moraCount);
+    // fullTargetLevels already has moraCount + 1 entries -- the word's own
+    // morae plus the trailing pseudo-mora for what follows it (H only for
+    // heiban, L otherwise; see PitchDiagram.pitchLevels). In particle mode
+    // the learner actually said that trailing mora (が), so it's scored for
+    // real against the full, unsliced pattern; otherwise it's sliced off as
+    // before, since nothing was recorded for it.
+    var targetPattern = particleModeForWord ? fullTargetLevels : fullTargetLevels.slice(0, moraCount);
     var score = MoraSegment.scorePattern(learnerPattern, targetPattern);
 
-    // Append a trailing hollow dot to the learner diagram too, mirroring the
-    // TARGET's trailing level -- purely for visual alignment with the
-    // target diagram above it (same dot count, same x-positions), not a
-    // claim about anything actually measured. The mic recording stops at
-    // the word itself, so there's no real detected pitch for whatever comes
-    // after it (see docs/2026-09-05-pitch-accent-evaluation-research-plan.md
-    // for the future-data-collection note this gap motivates).
-    var trailingLevel = fullTargetLevels[fullTargetLevels.length - 1];
     els.learnerDiagramRow.hidden = false;
-    els.learnerDiagram.innerHTML = PitchDiagram.renderSVG(learnerPattern.concat([trailingLevel]), {
-      variant: 'learner',
-    });
+    if (particleModeForWord) {
+      // Every slot in learnerPattern is real measured data (word morae AND
+      // the が mora) -- render it as-is with no decorative trailing dot,
+      // unlike the non-particle branch below.
+      els.learnerDiagram.innerHTML = PitchDiagram.renderSVG(learnerPattern, {
+        variant: 'learner',
+        trailing: false,
+      });
+    } else {
+      // Append a trailing hollow dot to the learner diagram too, mirroring
+      // the TARGET's trailing level -- purely for visual alignment with the
+      // target diagram above it (same dot count, same x-positions), not a
+      // claim about anything actually measured. The mic recording stops at
+      // the word itself, so there's no real detected pitch for whatever
+      // comes after it (see
+      // docs/2026-09-05-pitch-accent-evaluation-research-plan.md for the
+      // future-data-collection note this gap motivates, and the
+      // particle-mode design spec for the opt-in mode that fills it).
+      var trailingLevel = fullTargetLevels[fullTargetLevels.length - 1];
+      els.learnerDiagram.innerHTML = PitchDiagram.renderSVG(learnerPattern.concat([trailingLevel]), {
+        variant: 'learner',
+      });
+    }
 
     if (SettingsManager.get('showContour')) {
       els.contourRow.hidden = false;
-      els.contourGraph.innerHTML = PitchContour.renderSVG(trace, fullTargetLevels, segmented);
+      // includeTrailing: true in particle mode -- the recorded span covers
+      // moraCount + 1 real morae (word + が), not just the word, so the
+      // target step-line must divide across all of fullTargetLevels rather
+      // than dropping its last entry (see buildTargetSteps' doc comment).
+      els.contourGraph.innerHTML = PitchContour.renderSVG(trace, fullTargetLevels, segmented, {
+        includeTrailing: particleModeForWord,
+      });
     }
 
     els.moraFeedback.hidden = false;
     els.moraFeedback.innerHTML = score.perMora.map(function (status, i) {
-      return '<span class="mora-chip ' + status + '">' + (i + 1) + '</span>';
+      // The last chip is the が mora in particle mode -- labeled が rather
+      // than an unexplained extra number.
+      var label = (particleModeForWord && i === score.total - 1) ? PARTICLE_MORA : (i + 1);
+      return '<span class="mora-chip ' + status + '">' + label + '</span>';
     }).join('');
 
     els.scoreText.hidden = false;
@@ -770,6 +825,16 @@
       } else if (els.contourGraph.innerHTML) {
         els.contourRow.hidden = false;
       }
+    });
+
+    els.settingParticleMode.checked = SettingsManager.get('particleMode');
+    els.settingParticleMode.addEventListener('change', function () {
+      SettingsManager.set('particleMode', els.settingParticleMode.checked);
+      // Deliberately does NOT update the word already on screen -- takes
+      // effect from the next word, same as level/autoPlayReference above
+      // (see particleModeForWord's own comment for why keeping the "＋ が"
+      // suffix and what gets scored in sync matters more here than for most
+      // other settings).
     });
 
     syncLevelButtons();

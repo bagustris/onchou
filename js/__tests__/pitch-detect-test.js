@@ -208,5 +208,11 @@ withGlobals({ MediaRecorder: fakeMediaRecorder(null) }, () => {
   eq('no isTypeSupported still counts as playback-capable', PitchDetect.playbackSupported(), true);
 });
 
+// _frameRms: the per-frame level stored in every trace entry, which
+// mora-segment.js's voice gate compares against the take's loudest frame.
+// ~1/sqrt(2): the 1024-sample window isn't a whole number of periods.
+near('frameRms of a unit-amplitude sine is ~1/sqrt(2)', PitchDetect._frameRms(sineWave(220, SAMPLE_RATE, N)), Math.SQRT1_2, 0.01);
+eq('frameRms of silence is 0', PitchDetect._frameRms(new Float32Array(N)), 0);
+
 console.log(`pitch-detect-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
