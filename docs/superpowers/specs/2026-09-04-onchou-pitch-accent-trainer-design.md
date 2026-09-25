@@ -283,6 +283,66 @@ Caveat: all measurement here is synthetic audio (additive harmonic stacks +
 Gaussian noise), not recorded human speech — it validates the pipeline's
 logic under known-ground-truth conditions, not real-speech accuracy.
 
+### 2026-09-25 addendum: segmentByMora's decision rule replaced after real-audio evaluation
+
+Evaluated on real speech for the first time (JSUT + jsut-label's manual
+accent labels, held-out sentences; full write-up in
+`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`),
+the 2-cluster `classifyLevels` rule above carried essentially no accent
+information: within-mora-count Cohen's κ 0.004 on continuous phrases and
+−0.04 on words with real silence around them, scoring below a no-audio
+constant guess. Two causes were diagnosed: the estimator reports pitch on
+near-silence, stretching the voiced span every slot is cut from; and
+realized accent events land late relative to their mora (F0 peak delay),
+which an independent per-mora split can't absorb, nor declination.
+
+`segmentByMora` now (1) treats frames more than 15dB below the take's
+loudest frame as unvoiced (`js/pitch-detect.js` records per-frame `rms`);
+(2) reads each equal-width slot 40ms late (the largest delay that keeps
+zero-delay synthetic words, glides included, at 100%); (3) decodes with
+`decodeAccentPattern`: only the n+1 valid Tokyo patterns are allowed (as in
+Ishi, Minematsu & Hirose 2001 and the accent-type identifiers of that line
+of work), each fit jointly with a bounded declination slope (the Fujisaki
+phrase/accent split), lowest residual wins. `MIN_SPLIT_CENTS` (100) now
+gates the fitted accent step, still reporting a flat attempt all-'unclear'.
+Slots with no voiced frames stay 'unclear'. `segmentByMora` also returns
+`slots` (the exact windows scored), which `js/pitch-contour.js` uses for its
+target step-line. `classifyLevels` is kept exported for
+`tools/pitch-accuracy-experiment.js` but no longer used by the app.
+
+Held-out result on app-like audio: κ −0.037 → 0.285, strict whole-pattern
+7.3% → 43.8%, per-mora 43.2% → 80.0%; the synthetic contract above is
+preserved (`tools/pitch-accuracy-experiment.js` Stage 2: 100% on every
+pass; `tools/synthetic-regression.js`: strong-contrast words stay at 100%,
+weak contrast under declination 38.9% → 86.5%, flat-attempt false exact
+matches go down except 2-mora/no-declination, 0% → 1.6%). Trade-off
+accepted: a constrained decoder maps a learner's out-of-set pattern (e.g.
+H,L,H,L) to the nearest valid one instead of reporting it verbatim.
+
+Follow-up (same day, multi-speaker isolated words from UME-JRF: 33 native
+Tokyo speakers, 141 learners): the above transferred (natives κ 0.029 →
+0.300), but left a third of native morae 'unclear' -- heiban words with a
+heavy first syllable (禁煙, 病院), which natives say without the initial
+rise. The decoder now guards a claimed fall and the no-fall shape
+separately, and waives the initial-rise requirement only for a heavy first
+syllable (`heavyInitial`, from the morae `app.js` now passes via
+`segmentByMora(trace, n, { morae })`). Natives κ → 0.353, 'unclear' 33% →
+13%; flat attempts are still rejected on accented words and on
+light-initial heiban words exactly as before.
+
+Second follow-up (Round 5): (1) the heavy-syllable rule now covers only
+heavy SONORANT syllables -- a geminate っ does not weaken initial lowering
+(Youngberg 2021; Venditti 1995/2005); (2) the declination bound is 75
+cents/mora for words of 3+ morae but stays 50 for 2-mora words, where a
+slope and a rise explain the same single difference (a wider bound let 16%
+of flat 2-mora takes with jitter pass); (3) window delay 20ms (isolated-word
+optimum on UME-JRF natives). A realistic monotone test (natives' own words
+resynthesized with no accent) found the proposed guard accepts 8.8% of
+accentless accented words (17% with declining drift) vs 21-26% for
+forced-choice learned scorers. A learned pattern table (js/accent-model.js)
+was built and kept OPT-IN: learned from connected speech, it misreads
+on-time steps by one mora.
+
 ### Scoring
 
 Per-mora comparison of the learner's pattern against the target pattern from

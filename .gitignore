@@ -1,2 +1,14 @@
 .specstory/
 .claude/
+
+# Generated output/caches from tools/evaluate-jsut-accuracy.js and
+# tools/jsut-signal-level-check.py -- reproducible from JSUT + jsut-label,
+# not source (see docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md).
+tools/tmp/
+__pycache__/
+# Native-rater study (tools/build-rating-set.js): items reference UME-JRF
+# research-only audio/speakers and the wav symlink points at it -- local only.
+tools/rating/items.json
+tools/rating/wav
+# Unpublished paper drafts -- kept local until submission/preprint.
+docs/paper/

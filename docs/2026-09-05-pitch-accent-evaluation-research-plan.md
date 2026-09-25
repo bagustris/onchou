@@ -7,6 +7,18 @@ Status: future work, not yet started. Target horizon: 2-3 years from
 this file covers how to later *prove* the pitch-detection method is correct,
 toward an academic paper.
 
+**2026-09-25 update:** part of this — signal-level (item 1) and part of
+decision-level (item 2) validation — no longer needs to wait on the full
+2-3-year data-collection effort below, because a usable real-audio labeled
+corpus (JSUT + jsut-label, both pre-existing, licensed research datasets)
+turned out to be available locally. See
+`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`
+for the results and, importantly, its scope caveats: that corpus is one
+native studio speaker reading continuous sentences, not a learner reading
+isolated words, so it does NOT close the "labeled native-speaker
+recordings"/consent/learner-corpus gap this plan describes below, nor the
+perceptual-validation layer (item 3) — those remain exactly as described.
+
 ## Motivation
 
 The shipped method (`js/pitch-detect.js` + `js/mora-segment.js`) is currently
@@ -70,19 +82,33 @@ horizon — the above evaluation cannot start without it.
 
 ### Known gap this motivates: no real trailing-particle pitch data
 
-The app's "Your attempt" pitch diagram (`js/app.js`'s `handleTrace`) shows a
-trailing hollow dot after the learner's own morae, mirroring the *target*
-diagram's trailing dot purely for visual/positional symmetry between the two
-— it is not a measurement. The target's trailing dot represents the
-analytically-known pitch of whatever follows the word (derived from the
-Kanjium accent rule in `PitchDiagram.pitchLevels`), but the app's mic
-recording captures only the word itself (bounded by
-`PitchDetect.startRecording`'s max duration), so there is no equivalent real
-detected value for the learner. Any future recording protocol for the
-data-collection effort above should consider having speakers continue
-slightly past the target word (e.g. into a following particle like は/が/を)
-so a *real* detected trailing pitch becomes available to validate — or
-replace — this mirrored placeholder.
+**2026-09-25 update: partially closed.** This gap motivated
+`docs/superpowers/specs/2026-09-25-onchou-particle-mode-design.md`'s opt-in
+`particleMode` setting, which now has the learner say the word plus が and
+scores that trailing mora for real instead of showing a decorative hollow
+dot. The description below is the ORIGINAL (pre-particle-mode) gap, kept for
+history; it still applies whenever `particleMode` is off (the default).
+The JSUT real-audio evaluation
+(`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`)
+independently confirmed the underlying linguistic fact this motivates —
+`accentType=0` (heiban) never once appears across 33,821 real accent
+phrases, because heiban and odaka are acoustically indistinguishable from
+phrase-internal audio alone, exactly the ambiguity particle-mode's trailing
+が is meant to resolve for the learner.
+
+The app's "Your attempt" pitch diagram (`js/app.js`'s `handleTrace`), when
+`particleMode` is off, shows a trailing hollow dot after the learner's own
+morae, mirroring the *target* diagram's trailing dot purely for
+visual/positional symmetry between the two — it is not a measurement. The
+target's trailing dot represents the analytically-known pitch of whatever
+follows the word (derived from the Kanjium accent rule in
+`PitchDiagram.pitchLevels`), but the app's mic recording captures only the
+word itself (bounded by `PitchDetect.startRecording`'s max duration), so
+there is no equivalent real detected value for the learner. Any future
+recording protocol for the data-collection effort above should consider
+having speakers continue slightly past the target word (e.g. into a
+following particle like は/が/を) so a *real* detected trailing pitch
+becomes available to validate — or replace — this mirrored placeholder.
 
 Open questions to resolve before collection begins (not yet decided):
 
