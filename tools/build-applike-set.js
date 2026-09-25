@@ -15,7 +15,8 @@
 // across phrase boundaries), so it can't expose how the shipped pipeline
 // treats silence. This set can.
 //
-// Output: tools/tmp/jsut-applike-v1.json -- same sample shape as the main
+// Output: tools/tmp/jsut-applike-v2.json (v2: rebuilt with the fixed
+// phrase grouping in tools/jsut-lab-parser.js; moras carry phones) -- same sample shape as the main
 // trace cache ({sentenceId, moraCount, accentType, trace, spanStartSec,
 // spanEndSec, moras}) plus `position`.
 //
@@ -63,7 +64,7 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.lab')).sort()) {
     });
   }
 }
-const outPath = path.join(__dirname, 'tmp', 'jsut-applike-v1.json');
+const outPath = path.join(__dirname, 'tmp', 'jsut-applike-v2.json');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(out));
 console.error(`${out.length} app-like samples written to ${outPath}`);

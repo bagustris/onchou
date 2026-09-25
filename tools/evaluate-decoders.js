@@ -2,7 +2,7 @@
 // evaluate-decoders.js -- compares the accent decoders in
 // tools/accent-decoders.js on real JSUT audio, reusing the trace cache that
 // tools/evaluate-jsut-accuracy.js writes (run that first with --pad-ms 30;
-// it produces tools/tmp/jsut-traces-cache-v3-limitInfinity-pad30.json).
+// it produces tools/tmp/jsut-traces-cache-v4-limitInfinity-pad30.json).
 //
 // Held-out protocol: parameters are tuned ONLY on sentences BASIC5000_0001..
 // 4000 ("train"); every number reported as a result is on 4001..5000
@@ -16,9 +16,10 @@ const path = require('path');
 const PitchDiagram = require('../js/pitch-diagram.js');
 const MoraSegment = require('../js/mora-segment.js');
 const D = require('./accent-decoders.js');
+const { moraeOf } = require('./paper-harness.js');
 
 const cachePath = process.argv[2] ||
-  path.join(__dirname, 'tmp', 'jsut-traces-cache-v3-limitInfinity-pad30.json');
+  path.join(__dirname, 'tmp', 'jsut-traces-cache-v4-limitInfinity-pad30.json');
 const samples = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
 
 // 'BASIC5000_0123' -> 123 (the corpus name itself contains digits, so take
@@ -46,7 +47,7 @@ function precompute(set, boundaryMode, method) {
 
 // Why per-mora accuracy is NOT the headline metric: a decoder that ignores
 // the audio entirely and always outputs the most frequent pattern for each
-// mora count scores 65.9% per-mora / 40.4% strict on the test split --
+// mora count scores 66.1% per-mora / 41.1% strict on the test split --
 // higher than every audio-based decoder under those two metrics -- because
 // the corpus's pattern distribution is heavily skewed. Such a decoder is
 // useless to a learner (it says the same thing whatever they produce). The
@@ -160,7 +161,7 @@ const rows = [];
   const prior = evaluate(test, teV, (s) => maj[s.moraCount] || new Array(s.moraCount).fill('L'));
   rows.push({ label: 'majority prior (no audio)', test: prior });
   console.log(line('majority prior (NO AUDIO)', prior));
-  const shipped = evaluate(test, teV, (s) => MoraSegment.segmentByMora(s.trace, s.moraCount).pattern);
+  const shipped = evaluate(test, teV, (s) => MoraSegment.segmentByMora(s.trace, s.moraCount, { morae: moraeOf(s) }).pattern); // exactly what app.js calls, incl. the heavy-syllable rule
   rows.push({ label: 'shipped segmentByMora', test: shipped });
   console.log(line('shipped segmentByMora', shipped));
   console.log('');

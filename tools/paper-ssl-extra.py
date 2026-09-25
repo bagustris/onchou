@@ -24,6 +24,22 @@ from transformers import AutoModel
 
 TMP = os.path.join(os.path.dirname(__file__), 'tmp')
 MODELS = [('microsoft/wavlm-large', 8), ('reazon-research/japanese-hubert-base-k2', 8)]
+
+def load_features(tag, L, export_path):
+    """Cached SSL slot features from tools/paper-ssl.py -- refused unless they
+    were built from exactly this export (features are aligned by position)."""
+    import hashlib
+    path = os.path.join(TMP, f'ssl-{tag}-slots.npz')
+    z = np.load(path, allow_pickle=True)
+    if 'fingerprint' not in z.files:
+        raise SystemExit(f'{path} has no fingerprint -- rebuild it with tools/paper-ssl.py')
+    model = {'wavlm-large': 'microsoft/wavlm-large', 'japanese-hubert-base-k2': 'reazon-research/japanese-hubert-base-k2'}[tag]
+    layers = sorted(int(k[1:]) for k in z.files if k.startswith('L'))
+    h = hashlib.sha1(open(export_path, 'rb').read()); h.update(f'|{model}|{layers}'.encode())
+    if str(z['fingerprint']) != h.hexdigest():
+        raise SystemExit(f'{path} is stale for {export_path} -- re-run tools/paper-ssl.py')
+    return z[f'L{L}']
+
 samples = [json.loads(l) for l in open(os.path.join(TMP, 'slots-export.jsonl'))]
 flat = [json.loads(l) for l in open(os.path.join(TMP, 'flat-export.jsonl'))]
 
@@ -70,7 +86,7 @@ jsut = split['jsutApp.train'] + split['jsutPhrase.train']
 W1 = lambda s: int(word_of(s)) % 2 == 0
 for name, L in MODELS:
     tag = name.split('/')[-1]
-    F = np.load(os.path.join(TMP, f'ssl-{tag}-slots.npz'), allow_pickle=True)[f'L{L}']
+    F = load_features(tag, L, os.path.join(TMP, 'slots-export.jsonl'))
     trA_all = split['ume.A']; trA_w1 = [i for i in trA_all if W1(samples[i])]
     teB_w2 = [i for i in split['ume.B'] if not W1(samples[i])]; teB_w1 = [i for i in split['ume.B'] if W1(samples[i])]
     lrn_w2 = [i for i in split['ume.learners'] if not W1(samples[i])]

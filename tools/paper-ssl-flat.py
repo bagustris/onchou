@@ -19,9 +19,24 @@ from transformers import AutoModel
 
 TMP = os.path.join(os.path.dirname(__file__), 'tmp')
 L = 8
+
+def load_features(tag, L, export_path):
+    """Cached SSL slot features from tools/paper-ssl.py -- refused unless they
+    were built from exactly this export (features are aligned by position)."""
+    import hashlib
+    path = os.path.join(TMP, f'ssl-{tag}-slots.npz')
+    z = np.load(path, allow_pickle=True)
+    if 'fingerprint' not in z.files:
+        raise SystemExit(f'{path} has no fingerprint -- rebuild it with tools/paper-ssl.py')
+    model = {'wavlm-large': 'microsoft/wavlm-large', 'japanese-hubert-base-k2': 'reazon-research/japanese-hubert-base-k2'}[tag]
+    layers = sorted(int(k[1:]) for k in z.files if k.startswith('L'))
+    h = hashlib.sha1(open(export_path, 'rb').read()); h.update(f'|{model}|{layers}'.encode())
+    if str(z['fingerprint']) != h.hexdigest():
+        raise SystemExit(f'{path} is stale for {export_path} -- re-run tools/paper-ssl.py')
+    return z[f'L{L}']
+
 train_rows = [json.loads(l) for l in open(os.path.join(TMP, 'slots-export.jsonl'))]
-z = np.load(os.path.join(TMP, 'ssl-wavlm-large-slots.npz'), allow_pickle=True)
-F = z[f'L{L}']
+F = load_features('wavlm-large', L, os.path.join(TMP, 'slots-export.jsonl'))
 
 def pitch_levels(n, a):
     return [('L' if i == 0 else 'H') if a == 0 else (('H' if i == 0 else 'L') if a == 1 else ('L' if i == 0 else ('H' if i < a else 'L'))) for i in range(n)]

@@ -22,11 +22,12 @@ const path = require('path');
 const PitchDiagram = require('../js/pitch-diagram.js');
 const MoraSegment = require('../js/mora-segment.js');
 const D = require('./accent-decoders.js');
+const { moraeOf } = require('./paper-harness.js');
 
 const TMP = path.join(__dirname, 'tmp');
 const sets = {
-  phrase: JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-traces-cache-v3-limitInfinity-pad30.json'), 'utf8')),
-  applike: JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-applike-v1.json'), 'utf8')),
+  phrase: JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-traces-cache-v4-limitInfinity-pad30.json'), 'utf8')),
+  applike: JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-applike-v2.json'), 'utf8')),
 };
 const num = (id) => Number(id.split('_').pop());
 const split = (arr) => ({ train: arr.filter((s) => num(s.sentenceId) <= 4000), test: arr.filter((s) => num(s.sentenceId) > 4000) });
@@ -68,7 +69,8 @@ function pipeline(cfg) {
     return D.decode(v, cfg.decoder, { minContrastCents: 100, maxDeclCents: 50 });
   };
 }
-const shipped = (s) => MoraSegment.segmentByMora(s.trace, s.moraCount).pattern;
+// Exactly what app.js calls, incl. the morae that enable the heavy-syllable rule.
+const shipped = (s) => MoraSegment.segmentByMora(s.trace, s.moraCount, { morae: moraeOf(s) }).pattern;
 
 const pct = (x) => (x * 100).toFixed(1) + '%';
 function report(label, fn) {

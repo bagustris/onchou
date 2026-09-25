@@ -2,7 +2,7 @@
 
 > **Status update (Round 3):** the per-mora accuracy used in the Round 1–2
 > sections below turned out to reward the corpus's pattern skew rather than
-> accent discrimination (a no-audio guess scores 65.9%). Re-measured with
+> accent discrimination (a no-audio guess scores ~66%). Re-measured with
 > within-mora-count κ, the old shipped classifier was at chance, and three
 > literature-derived changes — a relative voice gate, a 40ms peak-delay
 > window shift, and constrained template decoding with joint declination —
@@ -12,6 +12,22 @@
 > (natives κ 0.029 → 0.353, 'unclear' 33% → 13%). See "Round 3" and
 > "Round 4" near the end; earlier sections are kept as the record of how
 > that was reached.
+
+> **Correction (2026-09-26, PR review):** `tools/jsut-lab-parser.js` grouped
+> phones into accent phrases by `(f1, f2)` only, which merged ADJACENT
+> phrases sharing a mora count and accent type (e.g. BASIC5000_4989:
+> こばやし `F:4_4...@1_2` then いさむわ `F:4_4...@2_1`, no pause). 1,153 of
+> the corpus's 34,974 phrases (3.3%, 994 sentences) were merged into their
+> predecessor, producing samples whose mora spans crossed the boundary. It
+> now groups by the whole F field and splits wherever the mora position
+> resets. All experiments were re-run on the corrected data (tools/tmp/v5
+> outputs); changes are small (e.g. shipped decoder on JSUT app-like test
+> κ 0.242 → 0.236; JSUT-trained Gaussians on UME-JRF natives B 0.530 →
+> 0.514; the signal-level figures below are updated), UME-JRF-only results
+> are unaffected, and every shipped constant still wins under the
+> criterion it was chosen by. Other JSUT figures quoted in the round-by-
+> round sections below are the PRE-correction values, kept as the
+> historical record of how each decision was reached.
 
 ## Problem
 
@@ -190,7 +206,7 @@ By accent type (per-mora accuracy / exact-match rate):
 | nakadaka | 61.6% | 6.0% | 14,308 |
 | atamadaka | 56.3% | 21.7% | 8,807 |
 
-(No heiban phrases appear in this table at all — 0 of 33,821, confirmed by
+(No heiban phrases appear in this table at all — 0 of 33,821 (0 of 34,974 with the corrected parser), confirmed by
 grepping the raw `.lab` files directly for `F:N_0#`, zero hits corpuswide.
 This is not a parser bug — see "jsut-label cannot express heiban distinctly
 from odaka" below, which also explains why this is harmless for the
@@ -444,10 +460,10 @@ on 400 real accent-phrase clips (~14,600 frames):
 
 | Metric | Value |
 |---|---|
-| Voicing agreement | 74.2% |
+| Voicing agreement | 78.5% (was 74.2% before frames with no reference within 15ms were excluded) |
 | Both-voiced frames | 63.4% of compared |
 | GPE (>20% relative error) | 1.2% of both-voiced frames |
-| RMSE (excl. GPE frames) | 23.6 cents |
+| RMSE (excl. GPE frames) | 24.1 cents |
 
 Near-zero gross/octave errors and ~24 cents RMSE (a quarter of a semitone)
 against an independent reference extractor, on real speech, is a clean
@@ -464,7 +480,7 @@ or bad pitch tracking.
 All of the per-mora numbers above (≈57%) turn out to be dominated by the
 corpus's skewed accent-pattern distribution, not by anything the audio
 says. A decoder that ignores the audio entirely and always outputs the most
-frequent pattern for each mora count scores **65.9% per-mora and 40.4%
+frequent pattern for each mora count scores **66.1% per-mora and 41.1%
 strict** (every mora right) on the held-out split — higher than the shipped
 classifier, and higher than every audio-based variant tried in the rounds
 above. Such a decoder is useless to a learner (it gives the same verdict

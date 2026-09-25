@@ -40,11 +40,21 @@ samples = [json.loads(l) for l in open(EXPORT)]
 print(f'{len(samples)} samples; model {MODEL}; layers {LAYERS}', flush=True)
 
 # ---------------------------------------------------------------- features
+# The cache holds one feature array per export line, aligned BY POSITION, so
+# it is only valid for the exact export (and model/layers) it was built
+# from: a fingerprint of those is stored with it, and a mismatch rebuilds.
+import hashlib
+def export_fingerprint():
+    h = hashlib.sha1(open(EXPORT, 'rb').read())
+    h.update(f'|{MODEL}|{sorted(LAYERS)}'.encode())
+    return h.hexdigest()
+FP = export_fingerprint()
 cache = os.path.join(TMP, f'ssl-{tag}-slots.npz')
-if os.path.exists(cache):
-    z = np.load(cache, allow_pickle=True)
+z = np.load(cache, allow_pickle=True) if os.path.exists(cache) else None
+if z is not None and 'fingerprint' in z.files and str(z['fingerprint']) == FP and all(f'L{L}' in z.files for L in LAYERS):
     feats = {L: list(z[f'L{L}']) for L in LAYERS}
 else:
+    if z is not None: print('feature cache is stale (export/model/layers changed) -- rebuilding', flush=True)
     from transformers import AutoModel
     dev = 'cuda'
     model = AutoModel.from_pretrained(MODEL).to(dev).eval().half()
@@ -72,7 +82,7 @@ else:
                     rows.append(h[m].mean(0))
                 feats[L][i] = np.stack(rows).astype(np.float16)
         if k % 500 == 0: print(f'  {k}/{len(by_wav)} files', flush=True)
-    np.savez(cache, **{f'L{L}': np.array(feats[L], dtype=object) for L in LAYERS})
+    np.savez(cache, fingerprint=FP, **{f'L{L}': np.array(feats[L], dtype=object) for L in LAYERS})
 
 # ---------------------------------------------------------------- helpers
 def pitch_levels(n, a):

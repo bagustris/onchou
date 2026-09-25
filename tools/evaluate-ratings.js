@@ -54,7 +54,12 @@ function kappa(pairs) { const lab = [...new Set(pairs.flat())]; const n = pairs.
   return (po - pe) / (1 - pe); }
 for (let a = 0; a < raters.length; a++) for (let b = a + 1; b < raters.length; b++) {
   const pairs = learner.map(({ uid }) => [byUid[a].get(uid), byUid[b].get(uid)]).filter(([x, y]) => x && y && x.labels !== 'unsure' && y.labels !== 'unsure').map(([x, y]) => [x.labels, y.labels]);
-  console.log(`inter-rater ${raters[a].rater}-${raters[b].rater}: whole-word kappa ${kappa(pairs).toFixed(3)} (n=${pairs.length})`);
+  // Per-mora: each mora of each doubly-rated item is one H/L judgement pair.
+  const moraPairs = [];
+  for (const [x, y] of pairs) for (let i = 0; i < Math.min(x.length, y.length); i++) moraPairs.push([x[i], y[i]]);
+  const moraAgree = moraPairs.filter(([x, y]) => x === y).length / Math.max(1, moraPairs.length);
+  console.log(`inter-rater ${raters[a].rater}-${raters[b].rater}: whole-word kappa ${kappa(pairs).toFixed(3)} (n=${pairs.length}); ` +
+    `per-mora agreement ${(100 * moraAgree).toFixed(1)}%, per-mora kappa ${kappa(moraPairs).toFixed(3)} (n=${moraPairs.length} morae)`);
 }
 const consensus = new Map();
 for (const { it, uid } of learner) {

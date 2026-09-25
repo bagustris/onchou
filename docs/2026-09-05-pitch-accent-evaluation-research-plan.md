@@ -91,7 +91,7 @@ history; it still applies whenever `particleMode` is off (the default).
 The JSUT real-audio evaluation
 (`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`)
 independently confirmed the underlying linguistic fact this motivates —
-`accentType=0` (heiban) never once appears across 33,821 real accent
+`accentType=0` (heiban) never once appears across 34,974 real accent
 phrases, because heiban and odaka are acoustically indistinguishable from
 phrase-internal audio alone, exactly the ambiguity particle-mode's trailing
 が is meant to resolve for the learner.

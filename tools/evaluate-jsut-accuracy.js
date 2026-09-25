@@ -586,10 +586,13 @@ function runEvaluation(phraseSamples, minSplitCents, classifyFn, segmentMode) {
 // v2: trace entries gained an `energy` field (see buildTrace).
 // v3: phrase samples gained a `moras` field (real forced-aligned per-mora
 // spans, for segmentByMoraOracle / --oracle-boundaries).
+// v4: tools/jsut-lab-parser.js no longer merges ADJACENT phrases that share
+// (mora count, accent type) -- 3.3% of phrases were merged before -- and
+// each mora carries its phones.
 // Bumped on each change so a stale-shaped cache from an earlier run isn't
 // silently reused missing a field a newer experiment needs.
 function traceCachePath(opts) {
-  return path.join(__dirname, 'tmp', `jsut-traces-cache-v3-limit${opts.limit}-pad${opts.padMs}.json`);
+  return path.join(__dirname, 'tmp', `jsut-traces-cache-v4-limit${opts.limit}-pad${opts.padMs}.json`);
 }
 
 function buildPhraseSamples(opts) {

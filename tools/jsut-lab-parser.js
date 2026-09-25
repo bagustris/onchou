@@ -49,6 +49,12 @@ const PHONE_RE = /^(.+?)\^(.+?)-(.+?)\+(.+?)=(.+?)\//;
 const A_FIELD_RE = /\/A:([^+]+)\+([^+]+)\+([^/]+)\//;
 // F:f1_f2#... -- only the leading two sub-fields are needed.
 const F_FIELD_RE = /\/F:([^_]+)_([^#]+)#/;
+// The WHOLE F field (f1_f2#f3_f4@f5_f6|f7_f8). f1/f2 alone describe a
+// phrase's mora count and accent type and are NOT a unique phrase key: two
+// adjacent phrases can share them (BASIC5000_4989: こばやし F:4_4...@1_2
+// then いさむわ F:4_4...@2_1, no pause between) -- f5_f6 (the phrase's
+// position in its breath group) is what tells them apart.
+const F_FULL_RE = /\/F:([^/]+)\//;
 
 // Phones that mark a boundary rather than real speech content within an
 // accent phrase -- both silence/pause labels AND any phone whose F-field
@@ -81,6 +87,8 @@ function parsePhoneLine(line) {
   const f1 = f1raw !== 'xx' ? Number(f1raw) : null;
   const f2 = f2raw !== 'xx' ? Number(f2raw) : null;
 
+  const fFull = context.match(F_FULL_RE);
+
   return {
     startSec: Number(startUnits) / HTK_UNITS_PER_SECOND,
     endSec: Number(endUnits) / HTK_UNITS_PER_SECOND,
@@ -88,6 +96,7 @@ function parsePhoneLine(line) {
     a2: a2,
     f1: f1,
     f2: f2,
+    fKey: fFull ? fFull[1] : null,
   };
 }
 
@@ -113,8 +122,12 @@ function parseAccentPhrases(labText) {
   let current = null;
   for (const p of phones) {
     if (isBoundaryPhone(p)) { current = null; continue; }
-    const key = p.f1 + '_' + p.f2;
-    if (!current || current.key !== key) {
+    // A new phrase starts when the full F field changes, or -- belt and
+    // braces -- when the mora position resets (a2 going backwards can only
+    // mean a new phrase began, even if every F value happened to repeat).
+    const key = p.fKey || (p.f1 + '_' + p.f2);
+    const last = current && current.phones[current.phones.length - 1];
+    if (!current || current.key !== key || (last && p.a2 != null && last.a2 != null && p.a2 < last.a2)) {
       current = { key: key, f1: p.f1, f2: p.f2, phones: [] };
       rawGroups.push(current);
     }

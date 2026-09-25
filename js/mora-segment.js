@@ -534,9 +534,9 @@
   // just because it's common). 838 numbers, trained on one JSUT speaker's
   // read speech (tools/build-accent-model.js). Held-out, this guarded
   // hybrid matches the model-free decoder on 16 unseen native speakers'
-  // isolated words (kappa 0.349 both) and beats it on connected speech
-  // (0.242 -> 0.374), with flat attempts still rejected -- see
-  // docs/paper/2026-09-25-interspeech-plan.md.
+  // isolated words (kappa ~0.35 both) and beats it on connected speech
+  // (0.236 -> 0.376), with flat attempts still rejected -- see
+  // docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md.
   //
   // OPT-IN ONLY (opts.useModel === true), and the app does not load it: the
   // table was learned from connected read speech, where accentual F0 events

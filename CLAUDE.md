@@ -80,7 +80,7 @@ dependency order, each an IIFE-scoped global:
    against a target pattern; unit-tested against synthetic traces.
    `segmentByMora` gates frames more than `VOICE_GATE_DB` (15) below the
    take's loudest frame (the estimator reports pitch on silence), reads each
-   equal-width slot `PEAK_DELAY_MS` (40) late (accent F0 events are realized
+   equal-width slot `PEAK_DELAY_MS` (20) late (accent F0 events are realized
    late), and decodes with `decodeAccentPattern` — valid Tokyo patterns
    only, fit jointly with a bounded declination slope, all-'unclear' below
    `MIN_SPLIT_CENTS` (100). This replaced the 2-cluster `classifyLevels`
@@ -238,7 +238,7 @@ resynthesis test (`paper-flatten.py`), which any change to the decoder's
 evidence guards should be re-checked against. `tools/rating/` is a
 LOCAL-ONLY native-rater tool (UME-JRF audio is research-only: never host or
 publish it). Headline metric is within-mora-count
-Cohen's κ, NOT per-mora accuracy (a no-audio constant guess scores 65.9%
+Cohen's κ, NOT per-mora accuracy (a no-audio constant guess scores ~66%
 per-mora on this corpus) — see
 `docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`
 for the full design, results, and honest scope caveats (this is decision-

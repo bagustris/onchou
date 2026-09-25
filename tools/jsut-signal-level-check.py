@@ -76,17 +76,23 @@ def reference_f0_trace(samples, sr, span_start_sec, span_end_sec):
     return out
 
 
+NO_MATCH = object()  # sentinel: no reference frame close enough in time
+
+
 def nearest_hz(trace_pairs, tMs, tolerance_ms=15):
-    """trace_pairs: list of (tMs, hz|None). Returns the hz at the closest
-    tMs within tolerance_ms, or None."""
-    best = None
+    """trace_pairs: list of (tMs, hz|None). Returns the hz (None = the matched
+    reference frame is UNVOICED) of the closest frame within tolerance_ms, or
+    NO_MATCH when no reference frame is that close -- which must be skipped,
+    not counted as reference-unvoiced (it would inflate the frame count and
+    the voicing-agreement rate at clip edges)."""
+    best = NO_MATCH
     best_dist = tolerance_ms + 1
     for t, hz in trace_pairs:
         d = abs(t - tMs)
         if d < best_dist:
             best_dist = d
             best = hz
-    return best if best_dist <= tolerance_ms else None
+    return best if best_dist <= tolerance_ms else NO_MATCH
 
 
 def main():
@@ -101,6 +107,7 @@ def main():
     both_voiced_gpe = 0
     agree_voicing = 0
     total_compared = 0
+    unmatched = 0
     cents_errors = []  # only for non-GPE (fine) agreements
     wav_cache = {}
 
@@ -118,6 +125,9 @@ def main():
         for frame in phrase['trace']:
             ours_hz = frame['hz']
             ref_hz = nearest_hz(ref_trace, frame['tMs'])
+            if ref_hz is NO_MATCH:
+                unmatched += 1
+                continue
             ours_voiced = ours_hz is not None
             ref_voiced = ref_hz is not None
 
@@ -133,7 +143,7 @@ def main():
                     cents_errors.append(1200 * math.log2(ours_hz / ref_hz))
 
     print(f'Phrases processed: {len(phrases)}')
-    print(f'Frames compared: {total_compared}')
+    print(f'Frames compared: {total_compared} (skipped {unmatched} with no reference frame within 15ms)')
     print(f'Voicing agreement (both voiced or both unvoiced): {agree_voicing / total_compared * 100:.1f}%')
     if both_voiced:
         print(f'Both-voiced frames: {both_voiced} ({both_voiced / total_compared * 100:.1f}% of compared)')

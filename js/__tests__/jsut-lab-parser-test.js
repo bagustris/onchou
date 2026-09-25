@@ -28,11 +28,11 @@ function ok(desc, cond) {
 
 eq('parses start/end (100ns units -> seconds) and the center phone (p3)',
   parsePhoneLine('3000000 3400000 xx^sil-m+i=z/A:-2+1+3/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:3_3#0_xx@1_4|1_23/G:7_2%0_xx_0/H:xx_xx/I:4-23@1+1&1-4|1+23/J:xx_xx/K:1+4-23'),
-  { startSec: 0.3, endSec: 0.34, phone: 'm', a2: 1, f1: 3, f2: 3 });
+  { startSec: 0.3, endSec: 0.34, phone: 'm', a2: 1, f1: 3, f2: 3, fKey: '3_3#0_xx@1_4|1_23' });
 
 eq('a boundary phone (F field xx_xx) parses with f1/f2 both null',
   parsePhoneLine('0 3000000 xx^xx-sil+m=i/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#0_xx@xx_xx|xx_xx/G:3_3%0_xx_0/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:4_23/K:1+4-23'),
-  { startSec: 0, endSec: 0.3, phone: 'sil', a2: null, f1: null, f2: null });
+  { startSec: 0, endSec: 0.3, phone: 'sil', a2: null, f1: null, f2: null, fKey: 'xx_xx#0_xx@xx_xx|xx_xx' });
 
 ok('isBoundaryPhone true when f1/f2 are null',
   isBoundaryPhone({ f1: null, f2: null }));
@@ -89,6 +89,36 @@ const OUT_OF_RANGE_LAB = [
 ].join('\n');
 eq('a phrase whose accentType exceeds moraCount is dropped',
   parseAccentPhrases(OUT_OF_RANGE_LAB).length, 0);
+
+// Two ADJACENT phrases with the same (f1, f2) and no pause between them --
+// real lines from BASIC5000_4989.lab (こばやし, then いさむわ; both F:4_4,
+// distinguished only by the rest of the F field). They must stay two
+// phrases, not merge into one whose mora spans cross the boundary.
+const ADJ = [
+  '0 1000000 xx^xx-sil+k=o/A:xx+xx+xx/F:xx_xx#xx_xx@xx_xx|xx_xx',
+  '1000000 2000000 xx^sil-k+o=b/A:-3+1+4/F:4_4#0_xx@1_2|1_8',
+  '2000000 3000000 sil^k-o+b=a/A:-3+1+4/F:4_4#0_xx@1_2|1_8',
+  '3000000 4000000 k^o-b+a=y/A:-2+2+3/F:4_4#0_xx@1_2|1_8',
+  '4000000 5000000 o^b-a+y=a/A:-2+2+3/F:4_4#0_xx@1_2|1_8',
+  '5000000 6000000 b^a-y+a=sh/A:-1+3+2/F:4_4#0_xx@1_2|1_8',
+  '6000000 7000000 a^y-a+sh=i/A:-1+3+2/F:4_4#0_xx@1_2|1_8',
+  '7000000 8000000 y^a-sh+i=i/A:0+4+1/F:4_4#0_xx@1_2|1_8',
+  '8000000 9000000 a^sh-i+i=s/A:0+4+1/F:4_4#0_xx@1_2|1_8',
+  '9000000 10000000 sh^i-i+s=a/A:-3+1+4/F:4_4#0_xx@2_1|5_4',
+  '10000000 11000000 i^i-s+a=m/A:-2+2+3/F:4_4#0_xx@2_1|5_4',
+  '11000000 12000000 i^s-a+m=u/A:-2+2+3/F:4_4#0_xx@2_1|5_4',
+  '12000000 13000000 s^a-m+u=w/A:-1+3+2/F:4_4#0_xx@2_1|5_4',
+  '13000000 14000000 a^m-u+w=a/A:-1+3+2/F:4_4#0_xx@2_1|5_4',
+  '14000000 15000000 m^u-w+a=pau/A:0+4+1/F:4_4#0_xx@2_1|5_4',
+  '15000000 16000000 u^w-a+pau=sh/A:0+4+1/F:4_4#0_xx@2_1|5_4',
+].join('\n');
+{
+  const ps = parseAccentPhrases(ADJ);
+  eq('adjacent same-(f1,f2) phrases stay separate', ps.length, 2);
+  eq('first phrase ends where the second begins', ps[0].endSec, ps[1].startSec);
+  eq('second phrase starts at its own first mora', ps[1].startSec, 0.9);
+  eq('no mora span crosses the boundary', ps[0].moras.every((m) => m.endSec <= 0.9), true);
+}
 
 console.log(`jsut-lab-parser: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

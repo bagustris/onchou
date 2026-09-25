@@ -30,7 +30,8 @@ for c in 'kstnhmwdbp': P.setdefault(c, [c])
 
 def parse_lab(path):
     """-> list of accent phrases, each a list of moras (start, end, [phones]), via the same
-    F-field grouping as tools/jsut-lab-parser.js (a2 = mora position, F:f1_f2 = phrase key)."""
+    phrase grouping as tools/jsut-lab-parser.js (a2 = mora position; the whole F field is
+    the phrase key, plus a split wherever a2 resets)."""
     import re
     phones = []
     for line in open(path):
@@ -40,11 +41,17 @@ def parse_lab(path):
         m = re.match(r'^(.+?)\^(.+?)-(.+?)\+(.+?)=(.+?)/', ctx)
         a = re.search(r'/A:([^+]+)\+([^+]+)\+([^/]+)/', ctx)
         f = re.search(r'/F:([^_]+)_([^#]+)#', ctx)
-        phones.append((int(p[0]) / 1e7, int(p[1]) / 1e7, m.group(3), a.group(2) if a else 'xx', (f.group(1), f.group(2)) if f else ('xx', 'xx')))
+        # Group by the WHOLE F field: (f1, f2) alone is not a unique phrase key --
+        # adjacent phrases can share it (BASIC5000_4989: F:4_4...@1_2 then F:4_4...@2_1).
+        full = re.search(r'/F:([^/]+)/', ctx)
+        key = full.group(1) if (f and 'xx' not in (f.group(1), f.group(2))) else 'xx'
+        phones.append((int(p[0]) / 1e7, int(p[1]) / 1e7, m.group(3), a.group(2) if a else 'xx', key))
     groups, cur = [], None
     for s, e, ph, a2, key in phones:
-        if 'xx' in key: cur = None; continue
-        if cur is None or cur['key'] != key: cur = {'key': key, 'ph': []}; groups.append(cur)
+        if key == 'xx': cur = None; continue
+        # new phrase on a changed F field, or when the mora position resets
+        reset = cur is not None and cur['ph'] and a2 != 'xx' and cur['ph'][-1][3] != 'xx' and int(a2) < int(cur['ph'][-1][3])
+        if cur is None or cur['key'] != key or reset: cur = {'key': key, 'ph': []}; groups.append(cur)
         cur['ph'].append((s, e, ph, a2))
     out = []
     for g in groups:

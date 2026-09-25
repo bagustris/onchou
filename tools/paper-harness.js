@@ -50,7 +50,7 @@ function load() {
   };
   const num = (id) => Number(id.split('_').pop());
 
-  const app = JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-applike-v1.json'), 'utf8')).map((s) => {
+  const app = JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-applike-v2.json'), 'utf8')).map((s) => {
     const ph = phrasesOf(s.sentenceId);
     const p = s.position === 'initial' ? ph[0] : ph[ph.length - 1];
     return { ...s, accents: [s.accentType], morae: p.moras.map((m) => pseudoKana(m.phones)), cluster: s.sentenceId };
@@ -59,7 +59,7 @@ function load() {
   // Phrase cache entries are in label order per sentence (see
   // evaluate-jsut-accuracy.js buildPhraseSamples), so the k-th sample of a
   // sentence is its k-th parsed phrase.
-  const phraseRaw = JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-traces-cache-v3-limitInfinity-pad30.json'), 'utf8'));
+  const phraseRaw = JSON.parse(fs.readFileSync(path.join(TMP, 'jsut-traces-cache-v4-limitInfinity-pad30.json'), 'utf8'));
   const seen = new Map();
   const phrase = phraseRaw.map((s) => {
     const k = seen.get(s.sentenceId) || 0; seen.set(s.sentenceId, k + 1);
@@ -180,4 +180,7 @@ const predictShipped = (MS) => (s) => (MS || shipped).segmentByMora(s.trace, s.m
 
 const fmt = (r) => `k=${r.kappa.toFixed(3)} strict=${(100 * r.strict).toFixed(1)}% perMora=${(100 * r.perMora).toFixed(1)}% unclear=${(100 * r.unclear).toFixed(1)}%`;
 
-module.exports = { load, metrics, bootstrap, variant, predictShipped, targetFor, fmt, shipped };
+// Morae (pseudo-kana) for a JSUT sample from its own stored label phones.
+const moraeOf = (s) => (s.moras && s.moras[0] && s.moras[0].phones ? s.moras.map((m) => pseudoKana(m.phones)) : undefined);
+
+module.exports = { load, metrics, bootstrap, variant, predictShipped, targetFor, fmt, shipped, pseudoKana, moraeOf };

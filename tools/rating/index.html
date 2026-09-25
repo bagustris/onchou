@@ -43,6 +43,7 @@
       <button class="act primary" id="next" disabled>Next →</button>
     </div>
   </div>
+  <div class="card" id="error" hidden style="border-color: var(--accent); color: var(--accent)"></div>
   <div class="card"><div class="row"><button class="act" id="export">Export ratings (JSON)</button><span class="muted" id="saved"></span></div></div>
 </main>
 <script>
@@ -52,13 +53,33 @@
   var key = function () { return 'pitch-rating-' + rater; };
   var $ = function (id) { return document.getElementById(id); };
   function load() { try { return JSON.parse(localStorage.getItem(key()) || '{}'); } catch (e) { return {}; } }
-  function save(db) { try { localStorage.setItem(key(), JSON.stringify(db)); $('saved').textContent = 'saved ' + Object.keys(db).length; } catch (e) {} }
+  // Returns true only when the rating really reached localStorage. A failure
+  // (private mode, blocked storage, quota) must stop the study -- otherwise a
+  // rater could finish and export an empty or incomplete file without knowing.
+  function save(db) {
+    try {
+      localStorage.setItem(key(), JSON.stringify(db));
+      if (localStorage.getItem(key()) === null) throw new Error('not persisted');
+      $('saved').textContent = 'saved ' + Object.keys(db).length;
+      return true;
+    } catch (e) {
+      $('error').hidden = false;
+      $('error').textContent = '保存できませんでした / Could not save this rating (browser storage is blocked or full). ' +
+        'Please export what you have, then use a normal (non-private) browser window. The study is paused.';
+      ['play', 'unsure', 'next'].forEach(function (id) { $(id).disabled = true; });
+      return false;
+    }
+  }
   function show() {
     var db = load();
     while (idx < items.length && db[items[idx].uid]) idx++;
     $('prog').max = items.length; $('prog').value = idx;
     $('count').textContent = idx + ' / ' + items.length;
-    if (idx >= items.length) { $('word').textContent = '完了 / Done'; $('reading').textContent = 'Please export your ratings.'; $('morae').innerHTML = ''; $('next').disabled = true; return; }
+    if (idx >= items.length) {
+      $('word').textContent = '完了 / Done'; $('reading').textContent = 'Please export your ratings.'; $('morae').innerHTML = '';
+      ['play', 'unsure', 'next'].forEach(function (id) { $(id).disabled = true; });
+      return;
+    }
     var it = items[idx];
     $('word').textContent = it.word; $('reading').textContent = it.reading;
     labels = it.morae.map(function () { return null; });
@@ -72,9 +93,11 @@
     audio.src = it.audio; audio.play().catch(function () {});
   }
   function record(value) {
+    if (idx >= items.length) return; // study finished: late clicks are harmless
     var db = load(); var it = items[idx];
     db[it.uid] = { id: it.id, kind: it.kind, labels: value, t: Date.now() };
-    save(db); idx++; show();
+    if (!save(db)) return; // don't advance past a rating that wasn't stored
+    idx++; show();
   }
   $('start').onclick = function () {
     rater = $('rater').value.trim(); if (!rater) return;
