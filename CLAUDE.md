@@ -91,7 +91,13 @@ dependency order, each an IIFE-scoped global:
    diphthong -- not っ, per the phonology), from `opts.morae`, which
    `app.js` passes, because natives don't rise there. The declination slope
    bound is 75 cents/mora, but 50 for 2-mora words, where slope and rise
-   are confounded. `js/accent-model.js` (a small learned pattern-choice
+   are confounded. Silent morae (`SILENT_MORAE`, `silentMorae`): a geminate
+   っ and an i/u predicted devoiced by the voiceless-consonant rule (from
+   github.com/bagustris/ASR_JA_Vowel_Devoicing, checked against pYIN-labelled
+   JSUT audio in `tools/paper-devoicing.py`) get no F0 value. At the word's
+   edges they're left out of the voiced span's slot division, and they take
+   the decoded pattern's level instead of 'unclear'. Devoicing is assumed
+   only if three morae keep a voice. `js/accent-model.js` (a small learned pattern-choice
    table, built by `tools/build-accent-model.js`) is OPT-IN only
    (`opts.useModel: true`) and is not loaded by `index.html`: it was
    learned from connected read speech and misreads on-time accent steps by

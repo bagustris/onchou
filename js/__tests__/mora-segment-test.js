@@ -323,5 +323,43 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
   eq('useModel: output is still a valid Tokyo pattern', ['LHH', 'HLL', 'LHL'].includes(p), true);
 }
 
+
+// -- silent morae: geminate closures and predicted devoicing ----------------
+{
+  const MS = require('../mora-segment.js');
+  const sm = (r) => MS._silentMorae(require('../pitch-diagram.js').moraSplit(r));
+  eq('geminate っ is silent', sm('はっぽう'), [false, true, false, false]);
+  eq('ふそく: flagging ふ and く would leave one voiced mora, so none is assumed', sm('ふそく'), [false, false, false]);
+  eq('medial and final: かがくてき', sm('かがくてき'), [false, false, true, false, true]);
+  eq('no devoicing before a voiced onset: きやくが keeps き and く', sm('きやくが'), [false, false, false, false]);
+  eq('word-final devoicing: さんやく', sm('さんやく'), [false, false, false, true]);
+  eq('consecutive devoicing allowed: かくしてきた', sm('かくしてきた'), [false, true, true, false, true, false]);
+  eq('fewer than three voiced morae left: no devoicing assumed', sm('ひかくして'), [false, false, false, false, false]);
+  eq('2-mora つき: nothing would stay voiced, nothing flagged', sm('つき'), [false, false]);
+  eq('i/u before a voiceless geminate: すっぱいな', sm('すっぱいな'), [true, true, false, false, false]);
+  eq('すっぱい: devoicing す would leave two voiced morae, so only っ is silent', sm('すっぱい'), [false, true, false, false]);
+  eq('particle が after the word: final く no longer word-final', MS._silentMorae(['か', 'く', 'が']), [false, false, false]);
+  eq('3-mora word keeps all three voiced when one would be lost', MS._silentMorae(['し', 'か', 'が']), [false, false, false]);
+  eq('three voiced morae left: devoicing kept', MS._silentMorae(['し', 'か', 'が', 'が']), [true, false, false, false]);
+  eq('voiced onsets never devoice', sm('じんぶつ'), [false, false, false, true]);
+  // Leading silent mora: the voiced span is split among the other morae,
+  // the silent one gets a zero-width slot and a null value.
+  const tr = dense([100, 150], 150); // voicing for mora 2 and 3 only (す devoiced)
+  const c = MS._computeSlots(tr, 3, [true, false, false]);
+  eq('leading silent mora: null value', c.slotMedians[0], null);
+  eq('leading silent mora: voiced span split among the rest', [c.slotMedians[1], c.slotMedians[2]], [100, 150]);
+  eq('leading silent mora: zero-width slot at the span start', c.slots[0][0] === c.slots[0][1], true);
+  // Decoding fills a silent mora from the winning pattern instead of 'unclear'.
+  eq('silent slot takes the decoded level', MS._decodeAccentPattern([100, null, 150, 150], { silent: [false, true, false, false] }), ['L', 'H', 'H', 'H']);
+  // End to end (SILENT_MORAE on): voicing only on morae 2-4 of a word whose
+  // first mora is devoiced (し before か). The voiced span is split among
+  // those three, and the devoiced mora takes the decoded pattern's level --
+  // here nakadaka-2, L H L L. Without morae, the same trace is cut into four
+  // equal slots and the fall lands in the wrong place.
+  eq('segmentByMora: devoiced first mora, fall after mora 2', segmentByMora(dense([150, 100, 100], 150), 4, { morae: ['し', 'か', 'が', 'が'] }).pattern, ['L', 'H', 'L', 'L']);
+  eq('segmentByMora: same trace without morae misplaces it', segmentByMora(dense([150, 100, 100], 150), 4).pattern.join('') === 'LHLL', false);
+  eq('other empty slots stay unclear', MS._decodeAccentPattern([100, null, 150, 150]), ['L', 'unclear', 'H', 'H']);
+}
+
 console.log(`mora-segment-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

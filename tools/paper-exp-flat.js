@@ -25,6 +25,7 @@ const ROOT = process.env.UMEJRF_DIR;
 const gauss = L.trainGauss([].concat(D.jsutApp.train, D.jsutPhrase.train));
 const systems = {
   'proposed (model-free, shipped)': (s) => MS.segmentByMora(s.trace, s.moraCount, { morae: s.morae }).pattern,
+  'proposed without silent morae': (() => { const V = H.variant({ SILENT_MORAE: false }); return (s) => V.segmentByMora(s.trace, s.moraCount, { morae: s.morae }).pattern; })(),
   'guarded hybrid (useModel)': (s) => MS.segmentByMora(s.trace, s.moraCount, { morae: s.morae, useModel: true }).pattern,
   'Gaussians, forced choice': (s) => { const g = L.gaussWithMargin(gauss, s); return g ? g.pat.split('') : new Array(s.moraCount).fill('unclear'); },
   'original 2-cluster': (() => { const V = H.variant({ VOICE_GATE_DB: 999, PEAK_DELAY_MS: 0 }); return (s) => { const c = V._computeSlots(s.trace, s.moraCount); return c ? V._classifyLevels(c.slotMedians) : new Array(s.moraCount).fill('unclear'); }; })(),
