@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitch rating</title>
+<!-- Local-only native-rater tool (tools/build-rating-set.js). Serves UME-JRF
+     audio from this machine; UME-JRF is research-only and must never be
+     published or hosted. Raters mark each mora H or L, blind to the target. -->
+<style>
+  :root { --bg: #faf8f5; --fg: #2b2622; --accent: #b5563c; --muted: #8a8378; --card: #fff; --border: #e3ddd5; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1d1b19; --fg: #eee8e1; --muted: #a39a8f; --card: #282522; --border: #3a3632; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 12px 0; }
+  .word { font-size: 2.2rem; margin: 0; } .reading { color: var(--muted); margin: 0 0 12px; }
+  .morae { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .mora { min-width: 64px; padding: 10px 6px; border: 2px solid var(--border); border-radius: 10px; background: none; color: var(--fg); font-size: 1.2rem; cursor: pointer; }
+  .mora span { display: block; font-size: .9rem; color: var(--muted); }
+  .mora.H { border-color: var(--accent); } .mora.H span, .mora.L span { color: var(--fg); font-weight: 700; }
+  button.act { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; font-size: 1rem; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); font-size: .9rem; } progress { width: 100%; }
+  input { padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+</style>
+</head>
+<body><main>
+  <h1>アクセント評定 / Pitch-accent rating</h1>
+  <div class="card" id="intro">
+    <p>音声を聞いて、各拍の高さ（高 H / 低 L）を選んでください。辞書の正解ではなく、<b>実際に聞こえた高さ</b>を記録してください。</p>
+    <p class="muted">Listen, then mark each mora High or Low as you actually HEAR it (not as the dictionary says). Tap a mora to cycle H → L. Use "unsure" if you can't tell. Keys: space = replay, Enter = next.</p>
+    <div class="row"><input id="rater" placeholder="rater ID (e.g. R1)"><button class="act primary" id="start">Start</button></div>
+  </div>
+  <div class="card" id="task" hidden>
+    <progress id="prog" max="1" value="0"></progress>
+    <p class="muted" id="count"></p>
+    <p class="word" id="word"></p><p class="reading" id="reading"></p>
+    <div class="morae" id="morae"></div>
+    <div class="row">
+      <button class="act" id="play">▶ Replay</button>
+      <button class="act" id="unsure">Unsure / can't tell</button>
+      <button class="act primary" id="next" disabled>Next →</button>
+    </div>
+  </div>
+  <div class="card" id="error" hidden style="border-color: var(--accent); color: var(--accent)"></div>
+  <div class="card"><div class="row"><button class="act" id="export">Export ratings (JSON)</button><span class="muted" id="saved"></span></div></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var items = [], idx = 0, rater = '', labels = [], audio = new Audio();
+  var key = function () { return 'pitch-rating-' + rater; };
+  var $ = function (id) { return document.getElementById(id); };
+  function load() { try { return JSON.parse(localStorage.getItem(key()) || '{}'); } catch (e) { return {}; } }
+  // Returns true only when the rating really reached localStorage. A failure
+  // (private mode, blocked storage, quota) must stop the study -- otherwise a
+  // rater could finish and export an empty or incomplete file without knowing.
+  function save(db) {
+    try {
+      localStorage.setItem(key(), JSON.stringify(db));
+      if (localStorage.getItem(key()) === null) throw new Error('not persisted');
+      $('saved').textContent = 'saved ' + Object.keys(db).length;
+      return true;
+    } catch (e) {
+      $('error').hidden = false;
+      $('error').textContent = '保存できませんでした / Could not save this rating (browser storage is blocked or full). ' +
+        'Please export what you have, then use a normal (non-private) browser window. The study is paused.';
+      ['play', 'unsure', 'next'].forEach(function (id) { $(id).disabled = true; });
+      return false;
+    }
+  }
+  function show() {
+    var db = load();
+    while (idx < items.length && db[items[idx].uid]) idx++;
+    $('prog').max = items.length; $('prog').value = idx;
+    $('count').textContent = idx + ' / ' + items.length;
+    if (idx >= items.length) {
+      $('word').textContent = '完了 / Done'; $('reading').textContent = 'Please export your ratings.'; $('morae').innerHTML = '';
+      ['play', 'unsure', 'next'].forEach(function (id) { $(id).disabled = true; });
+      return;
+    }
+    var it = items[idx];
+    $('word').textContent = it.word; $('reading').textContent = it.reading;
+    labels = it.morae.map(function () { return null; });
+    $('morae').innerHTML = '';
+    it.morae.forEach(function (m, i) {
+      var b = document.createElement('button'); b.className = 'mora'; b.innerHTML = m + '<span>?</span>';
+      b.onclick = function () { labels[i] = labels[i] === 'H' ? 'L' : 'H'; b.className = 'mora ' + labels[i]; b.querySelector('span').textContent = labels[i]; $('next').disabled = labels.indexOf(null) >= 0; };
+      $('morae').appendChild(b);
+    });
+    $('next').disabled = true;
+    audio.src = it.audio; audio.play().catch(function () {});
+  }
+  function record(value) {
+    if (idx >= items.length) return; // study finished: late clicks are harmless
+    var db = load(); var it = items[idx];
+    db[it.uid] = { id: it.id, kind: it.kind, labels: value, t: Date.now() };
+    if (!save(db)) return; // don't advance past a rating that wasn't stored
+    idx++; show();
+  }
+  $('start').onclick = function () {
+    rater = $('rater').value.trim(); if (!rater) return;
+    fetch('items.json').then(function (r) { return r.json(); }).then(function (d) {
+      items = d.items.map(function (it, i) { return Object.assign({ uid: i + ':' + it.id + ':' + it.kind }, it); });
+      $('intro').hidden = true; $('task').hidden = false; show();
+    });
+  };
+  $('play').onclick = function () { audio.currentTime = 0; audio.play(); };
+  $('unsure').onclick = function () { record('unsure'); };
+  $('next').onclick = function () { record(labels.join('')); };
+  document.addEventListener('keydown', function (e) {
+    if ($('task').hidden) return;
+    // Leave native keyboard activation alone on focused controls: Space/Enter
+    // on a mora button must toggle THAT mora, not replay or advance.
+    var t = e.target && e.target.tagName;
+    if (t === 'BUTTON' || t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+    if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+    if (e.key === 'Enter' && !$('next').disabled) $('next').click();
+  });
+  $('export').onclick = function () {
+    if (!rater) return;
+    var blob = new Blob([JSON.stringify({ rater: rater, exported: new Date().toISOString(), ratings: load() }, null, 1)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ratings-' + rater + '.json'; a.click();
+  };
+})();
+</script>
+</body>
+</html>

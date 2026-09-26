@@ -73,10 +73,31 @@ dependency order, each an IIFE-scoped global:
    `opts.onAudio` (so playback is exactly the audio that was scored), always
    *after* the trace — MediaRecorder flushes its last chunk asynchronously —
    and `null` on browsers where it isn't available (`playbackSupported()`),
-   which must never gate recording itself.
+   which must never gate recording itself. Each trace frame is
+   `{tMs, hz, rms}` — `rms` feeds mora-segment.js's voice gate.
 3. `js/mora-segment.js` (`MoraSegment`) — pure, DOM-free functions turning
    a raw pitch trace into a per-mora H/L/unclear pattern and scoring it
    against a target pattern; unit-tested against synthetic traces.
+   `segmentByMora` gates frames more than `VOICE_GATE_DB` (15) below the
+   take's loudest frame (the estimator reports pitch on silence), reads each
+   equal-width slot `PEAK_DELAY_MS` (20) late (accent F0 events are realized
+   late), and decodes with `decodeAccentPattern` — valid Tokyo patterns
+   only, fit jointly with a bounded declination slope, all-'unclear' below
+   `MIN_SPLIT_CENTS` (100). This replaced the 2-cluster `classifyLevels`
+   (kept exported only for `tools/pitch-accuracy-experiment.js`) after it
+   measured at chance on real speech — see the 2026-09-25 addendum in the
+   design spec. The no-fall shape's initial-rise requirement is waived for
+   a heavy SONORANT first syllable (`heavyInitial`: ん, ー, long vowel or
+   diphthong -- not っ, per the phonology), from `opts.morae`, which
+   `app.js` passes, because natives don't rise there. The declination slope
+   bound is 75 cents/mora, but 50 for 2-mora words, where slope and rise
+   are confounded. `js/accent-model.js` (a small learned pattern-choice
+   table, built by `tools/build-accent-model.js`) is OPT-IN only
+   (`opts.useModel: true`) and is not loaded by `index.html`: it was
+   learned from connected read speech and misreads on-time accent steps by
+   one mora, and it's derived from research-only JSUT audio. Every constant there
+   was tuned on held-out real audio AND re-checked against
+   `tools/synthetic-regression.js`; change them only with both.
 4. `js/pitch-contour.js` (`PitchContour`) — pure builders turning the raw
    per-frame F0 trace into a continuous learner curve (normalized to the
    recording's own median, in octaves, clamped; unvoiced frames break the
@@ -84,7 +105,9 @@ dependency order, each an IIFE-scoped global:
    the target H/L pattern. Supplementary to the dot diagram above, hidden
    behind a setting (`showContour`, off by default). Its `renderSVG` is a
    thin templating wrapper left to manual verification, matching
-   `pitch-diagram.js`'s own tested-builders/untested-renderer split.
+   `pitch-diagram.js`'s own tested-builders/untested-renderer split. The
+   target step-line sits on `segmentByMora`'s returned `slots` (the delayed
+   windows actually scored), not a re-derived equal division.
 5. `js/reference-audio.js` (`ReferenceAudio`) — the "▶ Play" button's
    backing module, via `window.speechSynthesis` only (no server-side TTS
    fallback); pure voice filtering/ranking helpers are Node-testable, live
@@ -99,10 +122,20 @@ dependency order, each an IIFE-scoped global:
    and without this mapping it would surface verbatim under the Play
    button.
 6. `js/settings.js` (`SettingsManager`) — `localStorage`-backed user
-   preferences (`autoPlayReference`, `showContour`, `level`) under the
-   `onchou-settings` key, surfaced by the hamburger settings panel ported
-   from the sibling apps. A thin wrapper with no branching logic, so (like
-   jlpt's own `settings.js`) it has no test file.
+   preferences (`autoPlayReference`, `showContour`, `level`, `particleMode`)
+   under the `onchou-settings` key, surfaced by the hamburger settings panel
+   ported from the sibling apps. A thin wrapper with no branching logic, so
+   (like jlpt's own `settings.js`) it has no test file.
+   `particleMode` (off by default) has the learner say the target word plus
+   the が particle instead of the bare word, and scores that trailing mora
+   for real — the only way heiban and odaka (identical across a word's own
+   morae, differing only in what happens on a following particle) become
+   distinguishable, and incidentally the only way a 1-mora word becomes
+   scoreable at all (a single mora otherwise has nothing else to be
+   relatively higher/lower than). `js/app.js`'s `particleModeForWord` is
+   snapshotted per word (not read live) so the "＋ が" prompt shown and what
+   gets scored can't disagree if the setting is toggled mid-card. See
+   `docs/superpowers/specs/2026-09-25-onchou-particle-mode-design.md`.
 7. `js/word-select.js` (`WordSelect`) — pure, DOM-free next-word selection:
    caps word length by the learner's chosen level (cumulative, so level "3"
    includes 2-mora words) and balances the draw across whichever accent
@@ -183,6 +216,37 @@ pitch-accent data (see `vendor/kanji-data/NOTE.md` for why it's currently a
 manual copy rather than a real git submodule, and the README for
 attribution). Runtime code reads only `data/words.json`, built from it by a
 `tools/` script — see the design spec's "Data" section.
+
+### Real-audio pitch-accuracy evaluation (research tooling, not runtime code)
+
+`tools/evaluate-jsut-accuracy.js` (+ `tools/wav-reader.js`,
+`tools/jsut-lab-parser.js`, `tools/jsut-signal-level-check.py`) run the
+shipped `js/pitch-detect.js`/`js/mora-segment.js` pipeline, unmodified,
+against the real JSUT speech corpus and jsut-label's manually-annotated
+accent labels. `tools/build-applike-set.js` builds the "app-like" set
+(phrases with their real surrounding silence); `tools/accent-decoders.js` +
+`tools/evaluate-decoders.js` + `tools/evaluate-pipeline.js` compare decoder
+variants on held-out sentences (4001–5000; tuning only ever sees 1–4000);
+`tools/synthetic-regression.js` is the synthetic guard any change to
+`segmentByMora` must also pass. `tools/build-umejrf-set.js` +
+`tools/evaluate-umejrf.js` test isolated words from 33 native speakers and
+141 learners (UME-JRF Set D, dictionary targets, speaker-bootstrap CIs) --
+the only multi-speaker, isolated-word check. `tools/paper-*.js` /
+`tools/paper-*.py` hold the Interspeech experiments (see
+`docs/paper/2026-09-25-interspeech-plan.md`), including the monotone
+resynthesis test (`paper-flatten.py`), which any change to the decoder's
+evidence guards should be re-checked against. `tools/rating/` is a
+LOCAL-ONLY native-rater tool (UME-JRF audio is research-only: never host or
+publish it). Headline metric is within-mora-count
+Cohen's κ, NOT per-mora accuracy (a no-audio constant guess scores ~66%
+per-mora on this corpus) — see
+`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`
+for the full design, results, and honest scope caveats (this is decision-
+and signal-level validation on one native studio speaker's continuous
+speech, not a learner-recording or perceptual-validation study — see
+`docs/2026-09-05-pitch-accent-evaluation-research-plan.md`, which this
+partially, not fully, closes). Output/caches under `tools/tmp/` are
+reproducible, `.gitignore`d, and never committed.
 
 ### Shared CSS tokens
 

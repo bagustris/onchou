@@ -133,6 +133,18 @@
   // Normalized autocorrelation F0 estimate for one frame of time-domain
   // samples (Float32Array, values in [-1, 1]). Returns a frequency in Hz, or
   // null if the frame doesn't look voiced.
+  // RMS level of one frame, stored alongside hz in every trace entry.
+  // estimatePitch reports pitch on near-silence (random 70-400Hz values
+  // 25-58dB below a take's loudest frame, measured on real recordings --
+  // see docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md),
+  // so mora-segment.js uses this to gate those frames out relative to the
+  // take's own peak before cutting mora slots.
+  function frameRms(samples) {
+    var s = 0;
+    for (var i = 0; i < samples.length; i++) s += samples[i] * samples[i];
+    return Math.sqrt(s / samples.length);
+  }
+
   function estimatePitch(samples, sampleRate) {
     var n = samples.length;
 
@@ -325,7 +337,7 @@
           analyser.getFloatTimeDomainData(timeDomainBuf);
           var hz = estimatePitch(timeDomainBuf, ctx.sampleRate);
           var tMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
-          trace.push({ tMs: tMs, hz: hz });
+          trace.push({ tMs: tMs, hz: hz, rms: frameRms(timeDomainBuf) });
         }
 
         intervalId = setInterval(captureFrame, HOP_MS);
@@ -481,6 +493,7 @@
     stopRecording: stopRecording,
     // Exposed for testing the pure estimator against synthetic signals.
     _estimatePitch: estimatePitch,
+    _frameRms: frameRms,
     _FRAME_SIZE: FRAME_SIZE,
     _HOP_MS: HOP_MS,
     _MAX_DURATION_MS: MAX_DURATION_MS,

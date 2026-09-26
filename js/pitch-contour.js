@@ -60,23 +60,44 @@
     return segments;
   }
 
-  // buildTargetSteps(targetLevels, spanStart, spanEnd) -> [{tStart, tEnd, level}, ...]
+  // buildTargetSteps(targetLevels, spanStart, spanEnd, opts) -> [{tStart, tEnd, level}, ...]
   //
   // targetLevels: full pitchLevels() output (one 'H'/'L' per mora PLUS one
-  // trailing pseudo-mora). The trailing entry is excluded here -- it
+  // trailing pseudo-mora). The trailing entry is excluded by default -- it
   // represents pitch on whatever follows the word, not a moment that
   // actually happened during this recording, so it has no time span to
   // occupy on this graph.
+  //
+  // opts.includeTrailing: pass true when the caller's span actually DOES
+  // cover that trailing mora -- i.e. particle mode (js/app.js's
+  // particleModeForWord), where the learner recorded the word plus が and
+  // MoraSegment.segmentByMora was called with moraCount + 1 slots. Without
+  // this, the step-line would still show only `moraCount` steps stretched
+  // across a span that spans moraCount + 1 real recorded morae: too few
+  // steps, each too wide, misaligned against the learner curve.
   //
   // spanStart/spanEnd: the same voiced-frame time span js/mora-segment.js's
   // segmentByMora already computes and now returns, divided into
   // equal-width slots identically to segmentByMora's own time-proportional
   // division -- so this step-line's mora boundaries land exactly on the
   // slots that were actually scored, not an independently-guessed timing.
-  function buildTargetSteps(targetLevels, spanStart, spanEnd) {
-    var wordLevels = (targetLevels || []).slice(0, -1);
+  //
+  // opts.slots: segmentByMora's own `slots` ([[startMs, endMs], ...]). When
+  // given (and its length matches), steps are placed on exactly those
+  // windows instead -- segmentByMora reads each mora a fixed peak delay
+  // late (see its PEAK_DELAY_MS), so the plain equal division above would
+  // no longer be where the scoring actually happened.
+  function buildTargetSteps(targetLevels, spanStart, spanEnd, opts) {
+    opts = opts || {};
+    var wordLevels = opts.includeTrailing ? (targetLevels || []) : (targetLevels || []).slice(0, -1);
     var moraCount = wordLevels.length;
     if (moraCount < 1) return [];
+
+    if (opts.slots && opts.slots.length === moraCount) {
+      return wordLevels.map(function (level, i) {
+        return { tStart: opts.slots[i][0], tEnd: opts.slots[i][1], level: level };
+      });
+    }
 
     var span = spanEnd - spanStart;
     var sliceWidth = span > 0 ? span / moraCount : 0;
@@ -97,6 +118,9 @@
   // rather than recomputing it, so the target step-line and the learner
   // line are guaranteed to agree on the same span/median a caller already
   // used for scoring.
+  //
+  // opts.includeTrailing: forwarded to buildTargetSteps -- see its own doc
+  // comment (particle mode).
   //
   // Thin string-templating over the two pure builders above -- left to
   // manual in-browser verification rather than unit-tested, matching
@@ -134,7 +158,8 @@
       }).join(' ');
     }).join(' ');
 
-    var steps = buildTargetSteps(targetLevels, segment.spanStart, segment.spanEnd);
+    var steps = buildTargetSteps(targetLevels, segment.spanStart, segment.spanEnd,
+      Object.assign({}, opts, { slots: segment.slots }));
     var targetPath = steps.map(function (step, i) {
       var y = yAtLevel(step.level);
       var startCmd = (i === 0 ? 'M' : 'L') + xAt(step.tStart) + ',' + y;

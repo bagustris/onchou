@@ -79,5 +79,34 @@ eq('degenerate zero-width span -> zero-width steps at spanStart',
     { tStart: 5, tEnd: 5, level: 'H' },
   ]);
 
+// Particle mode (js/app.js's particleModeForWord): the recording covers the
+// trailing が mora too, so opts.includeTrailing keeps it in the division
+// instead of excluding it -- same 4-entry levels array as the first case
+// above, but now divided into 4 steps over the same span, not 3.
+eq('includeTrailing keeps the trailing pseudo-mora in the division (particle mode)',
+  buildTargetSteps(['L', 'H', 'H', 'H'], 0, 400, { includeTrailing: true }),
+  [
+    { tStart: 0, tEnd: 100, level: 'L' },
+    { tStart: 100, tEnd: 200, level: 'H' },
+    { tStart: 200, tEnd: 300, level: 'H' },
+    { tStart: 300, tEnd: 400, level: 'H' },
+  ]);
+
+// segmentByMora's own `slots` (delayed windows) take precedence over the
+// equal division, so the step-line sits where the scoring actually happened.
+eq('opts.slots places each step on the scored window',
+  buildTargetSteps(['L', 'H', 'L', 'L'], 0, 300, { slots: [[50, 150], [150, 250], [250, 300]] }),
+  [
+    { tStart: 50, tEnd: 150, level: 'L' },
+    { tStart: 150, tEnd: 250, level: 'H' },
+    { tStart: 250, tEnd: 300, level: 'L' },
+  ]);
+eq('opts.slots with a mismatched length is ignored (falls back to equal division)',
+  buildTargetSteps(['L', 'H', 'H'], 0, 200, { slots: [[0, 50]] }),
+  [
+    { tStart: 0, tEnd: 100, level: 'L' },
+    { tStart: 100, tEnd: 200, level: 'H' },
+  ]);
+
 console.log(`pitch-contour: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

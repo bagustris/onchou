@@ -38,6 +38,14 @@
       </label>
     </div>
 
+    <div class="settings-row">
+      <span class="settings-row-label" id="setting-particle-mode-label">助詞つき練習<span>Practice with a trailing が particle (distinguishes heiban/odaka)</span></span>
+      <label class="switch">
+        <input type="checkbox" id="setting-particle-mode" aria-labelledby="setting-particle-mode-label">
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+
     <div class="settings-row settings-row-column">
       <span class="settings-row-label">練習レベル<span>Practice level (word length, cumulative)</span></span>
       <div id="setting-level" class="settings-segmented" role="radiogroup" aria-label="Practice level">
@@ -78,7 +86,7 @@
 
     <div id="quiz" class="card word-card" hidden>
       <p id="word-text" class="word-text"></p>
-      <p id="word-reading" class="word-reading"></p>
+      <p id="word-reading" class="word-reading"></p><span id="word-reading-particle" class="word-reading-particle" hidden>＋ が</span>
 
       <div class="diagram-row">
         <span class="diagram-label">Target</span>

@@ -19,7 +19,11 @@ var SettingsManager = (function () {
   // learner who never opens Settings keeps seeing every word length they
   // always have, rather than being silently restricted to 2-mora words by
   // an update.
-  var DEFAULTS = { autoPlayReference: false, showContour: false, level: 'all' };
+  // particleMode defaults to false: an additive practice mode (say the word
+  // + が instead of the bare word, so heiban/odaka become distinguishable
+  // and scoreable -- see the particle-mode design spec) hidden until a
+  // learner opts in, same precedent as showContour.
+  var DEFAULTS = { autoPlayReference: false, showContour: false, level: 'all', particleMode: false };
 
   function load() {
     try {

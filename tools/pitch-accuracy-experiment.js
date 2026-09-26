@@ -18,6 +18,12 @@
 //      target Hz values, no estimator) to separate estimator error from
 //      segmentation-logic error.
 //
+// NOTE (2026-09-25): Stages 3-5 compare classifyLevels against the rule it
+// replaced; classifyLevels has itself since been retired from segmentByMora
+// (see the design spec's 2026-09-25 addendum). Stage 2 calls the real
+// segmentByMora, so it measures the current algorithm. The synthetic
+// contract for the CURRENT decoder lives in tools/synthetic-regression.js.
+//
 // Caveat stated up front: this is synthetic audio only (additive harmonic
 // stacks + Gaussian noise). It validates the pipeline's *logic* under
 // controlled, known-ground-truth conditions -- it is not a substitute for
