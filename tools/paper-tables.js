@@ -31,8 +31,8 @@ const original = (s) => { const c = Vorig._computeSlots(s.trace, s.moraCount); r
 // Ablation, adding one component at a time (production code, constants varied).
 const Vgate = H.variant({ PEAK_DELAY_MS: 0 });
 const gateOnly = (s) => { const c = Vgate._computeSlots(s.trace, s.moraCount); return c ? Vgate._classifyLevels(c.slotMedians) : new Array(s.moraCount).fill('unclear'); };
-const Vtmpl = H.variant({ PEAK_DELAY_MS: 0, MIN_RISE_HEAVY_CENTS: 100, FALLBACK_TO_NO_FALL: false });
-const Vdelay = H.variant({ MIN_RISE_HEAVY_CENTS: 100, FALLBACK_TO_NO_FALL: false });
+const Vtmpl = H.variant({ PEAK_DELAY_MS: 0, MIN_RISE_HEAVY_CENTS: 100, FALLBACK_TO_NO_FALL: false, SILENT_MORAE: false });
+const Vdelay = H.variant({ MIN_RISE_HEAVY_CENTS: 100, FALLBACK_TO_NO_FALL: false, SILENT_MORAE: false });
 const shipped = H.predictShipped();
 // Learned (JSUT-trained, cross-corpus): forced choice, and guarded by the shipped evidence guard.
 const gauss = L.trainGauss([].concat(D.jsutApp.train, D.jsutPhrase.train));
@@ -80,7 +80,8 @@ const abl = [
   ['+ relative voice gate', gateOnly],
   ['+ constrained templates, joint declination, split fall/rise guard', (s) => Vtmpl.segmentByMora(s.trace, s.moraCount, { morae: s.morae }).pattern],
   ['+ 20ms peak-delay window', (s) => Vdelay.segmentByMora(s.trace, s.moraCount, { morae: s.morae }).pattern],
-  ['+ heavy-first-syllable rule (= shipped)', shipped],
+  ['+ heavy-first-syllable rule', H.predictShipped(H.variant({ SILENT_MORAE: false }))],
+  ['+ silent morae: geminates, predicted devoicing (= shipped)', shipped],
 ];
 let prev = null;
 for (const [name, f] of abl) {

@@ -25,13 +25,17 @@ const TMP = path.join(__dirname, 'tmp');
 
 // ---- JSUT morae from jsut-label phones (pseudo-kana: only what
 // heavyInitial needs -- special morae and bare vowels -- is exact).
-const V = { a: 'か', i: 'き', u: 'く', e: 'け', o: 'こ' }, BARE = { a: 'あ', i: 'い', u: 'う', e: 'え', o: 'お' };
+// Onset voicing is kept too (voiceless onset -> か row, voiced -> が row),
+// for the silent-mora devoicing rule in js/mora-segment.js.
+const V = { a: 'か', i: 'き', u: 'く', e: 'け', o: 'こ' }, VV = { a: 'が', i: 'ぎ', u: 'ぐ', e: 'げ', o: 'ご' };
+const BARE = { a: 'あ', i: 'い', u: 'う', e: 'え', o: 'お' };
+const VOICELESS = new Set(['k', 'ky', 's', 'sh', 't', 'ts', 'ch', 'h', 'hy', 'f', 'p', 'py']);
 function pseudoKana(phones) {
   if (phones.length === 1 && phones[0] === 'N') return 'ん';
   if (phones.length === 1 && phones[0] === 'cl') return 'っ';
   const v = phones[phones.length - 1];
   if (phones.length === 1 && BARE[v]) return BARE[v];
-  return V[v] || 'か';
+  return (VOICELESS.has(phones[0]) ? V : VV)[v] || 'か';
 }
 
 let cache = null;

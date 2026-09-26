@@ -731,6 +731,180 @@ test 0.287; 0.300 with morae). Synthetic contract unchanged (synthetic
 traces carry no morae); Stage 2 100% on every pass. Verified end to end in
 headless Chrome.
 
+## Round 5: silent morae -- geminates and high-vowel devoicing (SHIPPED, 2026-09-26)
+
+### Why
+
+Error analysis of the shipped decoder on the choosing speakers (UME natives
+A, `tools/paper-exp-errors.js`): 65% of native takes correct; the rest
+mostly heiban words read with a spurious fall (20% of heiban takes), and
+takes left partly/all 'unclear' by morae with no F0 at all -- the closure of
+a geminate っ (はっぽう, せっき, いっつう: an empty slot) and devoiced high
+vowels at a word edge (きやく, ふぞく, ひかく: outside the voiced span, so
+every equal slot is cut one mora out of place).
+
+### Which vowels are really devoiced? (`tools/paper-devoicing.py`)
+
+The devoicing rule comes from github.com/bagustris/ASR_JA_Vowel_Devoicing:
+i/u with a voiceless onset before a voiceless onset, or utterance-final.
+That repo's Conformer is trained on the rule's labels, so its devoicing
+F1 (97%) measures agreement with the rule. Here every i/u vowel in JSUT
+basic5000 gets an acoustic label instead: its jsut-label phone segment, and
+the share of frames pYIN calls voiced (devoiced below 0.5). WORLD harvest
+was tried first and dropped. It over-extends voicing into devoiced vowels:
+on a 120-utterance sample it called 47% of the rule's candidates voiced,
+where pYIN and DIO, agreeing with each other, called 17-18%. With pYIN the
+split is clean: 82% of rule-environment vowels have under 10% voiced
+frames, and 16% are over 90% voiced.
+
+Test split of that repo (500 utterances, 5,452 i/u vowels, 14.8% devoiced):
+
+| predictor | P | R | F1 | F1 with DIO as reference |
+|---|---|---|---|---|
+| rule (the report's labels) | 81.8 | 86.0 | 83.8 | 82.3 |
+| the report's ASR model | 81.6 | 86.6 | 84.0 | 82.8 |
+| OpenJTalk devoicing | 87.9 | 77.5 | 82.4 | 80.0 |
+| rule + consecutive-devoicing blocking | 83.8 | 80.9 | 82.4 | 80.0 |
+| rule, not on an accent phrase's last mora | 85.1 | 80.6 | 82.8 | 80.1 |
+| rule, not on the accent nucleus | 83.0 | 76.9 | 79.8 | 77.5 |
+| **learned** (boosted trees, text-only context + accent, trained on acoustic labels of the train split) | 91.1 | 88.4 | **89.7** | **87.4** |
+
+Paired utterance bootstrap: learned − rule +5.9 F1 [+4.4, +7.3]. Learned −
+ASR +5.7 [+4.3, +7.3]. ASR − rule +0.1 [−0.4, +0.6]. The ASR model is
+statistically identical to the rule it was trained on. Training on acoustic
+labels, not rule labels, is what gains. The learned model picks up
+utterance-final whispering after voiced onsets (…い。, …る。), which the
+rule excludes by construction, and lower devoicing at phrase ends (52% in
+the rule's environment) and on the accent nucleus (73% vs 83%).
+
+Isolated words (`tools/paper-devoicing-ume.py`). The UME-JRF natives are
+measured through the coarse CTC mora alignment, so a floor applies:
+voiced-onset morae read as devoiced 17% of the time. Word-initial
+candidates are devoiced 84% of the time. Word-final ones depend on the word:
+あし 97%, いき 82%, but final く in ひかく, ふそく and きやく only 24%.
+
+### What shipped (`js/mora-segment.js`, `SILENT_MORAE`)
+
+`silentMorae(morae)` flags っ always, plus i/u devoicing by the rule on kana.
+Devoicing is assumed only when at least three morae keep a voice (all of
+them, in shorter words). Silent edge morae are left out of the voiced span's
+division; silent medial morae keep their share of time but no value. Every
+silent mora is shown at the level the decoded pattern gives it, not as
+'unclear'. The app already passes the morae, with が appended in particle
+mode, which correctly makes a word-final mora non-final.
+
+These settings were chosen on natives A plus JSUT app-like train
+(`tools/tmp/paper-silent-sweep.txt`). Two alternatives scored lower than the
+plain rule:
+- confirming edge devoicing per take from voiceless energy beyond the
+  voiced span;
+- dropping the word-final case.
+
+Consecutive-devoicing blocking scored lower on both natives A and the JSUT
+acoustics, so the rule doesn't block.
+
+MIN_VOICED_MORAE = 3, rather than 2 (natives A κ 0.475 vs 0.458), was chosen
+to hold the monotone false-acceptance rate on natives-B resynthesis
+(`tools/paper-exp-flat.js`). With 2, 3-mora atamadaka words like てんき were
+decoded from two values, and flat false acceptance rose from 6.8% to 8.9%.
+With 3 it's 7.1% (drifting: 14.2% → 14.6%). This is a guard-driven choice
+that looked at natives-B audio, and it's disclosed as such. The synthetic
+regression is unchanged, since synthetic words carry no kana.
+
+### Held-out results (`tools/paper-exp-silent.js`, paired cluster bootstrap)
+
+| split | before | + geminates | + geminates + devoicing | Δκ total [95% CI] |
+|---|---|---|---|---|
+| UME natives B | 0.351 | 0.373 | **0.388** | +0.036 [0.023, 0.050] |
+| JSUT app-like test | 0.236 | 0.262 | **0.278** | +0.042 [0.033, 0.055] |
+| UME learners (agreement) | 0.113 | 0.118 | 0.126 | +0.012 [0.009, 0.016] |
+
+On natives B, strict accuracy rises from 60.0% to 64.1% and 'unclear' falls
+from 12.8% to 11.2%. The native-vs-learner speaker AUC is unchanged at 0.914.
+Accepted correct words on the vocoded copies rise: accented 61.1% → 63.2%,
+no-fall 52.4% → 56.8%.
+
+### Not done / next
+
+- The learned devoicing predictor isn't in the app. It was trained on
+  research-only JSUT, and the app ships no learned models. A text-only
+  table built from licence-clean recordings could replace the rule.
+- A heiban word whose first mora is silent can't show its initial rise, so
+  its remaining morae are level and it stays 'unclear'.
+- The biggest remaining native error is the spurious final fall on heiban
+  words, especially heavy-initial ones.
+
+## Round 6: error detection on resynthesized wrong-accent takes (no raters; 2026-09-27)
+
+### Method (`tools/paper-swap.py`, `tools/paper-exp-swap.js`)
+
+Each native take of a single-accent word (UME natives A and B, 3,298 takes)
+is resynthesized with WORLD. The voice, timing and F0 micro-prosody stay the
+native speaker's own, but the accent is moved to every other valid shape.
+Morae whose level differs are shifted by the speaker's typical accent fall
+(the median H−L gap over that speaker's accented takes, 217–523 cents), with
+40 ms ramps at CTC mora boundaries. That gives 6,992 wrong takes with a
+known produced pattern. Each take also goes through the same code with zero
+shift ('selfswap'), a correct control with the identical vocoder round trip.
+
+A first pass used each take's own gap instead. That was wrong: a heiban
+take's own gap is only its initial rise (median −4 cents), so fall-added
+errors were synthesized at the 100-cent floor and too often accepted.
+
+Decision per take: accept (decoded pattern equals the target), abstain
+(all 'unclear'), or flag. **Detection** is the share of wrong takes not
+accepted. **False alarm** is the share of correct takes not accepted.
+**Youden's J** is detection minus false alarm, so rejecting everything
+scores 0. **Diagnosis** is the share of wrong takes decoded as exactly the
+produced pattern.
+
+### Results, natives B (reporting; speaker-bootstrap 95% CIs)
+
+| system | J | detection | false alarm | exact diagnosis |
+|---|---|---|---|---|
+| proposed (shipped) | **39.0** [31.4, 45.3] | 81.0 [78.7, 83.3] | 42.0 [36.6, 48.0] | **44.0** [40.8, 47.1] |
+| proposed without silent morae | 37.8 [30.7, 43.9] | 83.5 | 45.8 | 43.2 |
+| F0-ratio Gaussians (JSUT-trained), forced choice | 24.0 [19.1, 29.3] | 52.2 | 28.2 | 23.9 |
+
+On natives A (choosing), the shipped decoder scores J 52.0, detection 83.8
+and false alarm 31.8.
+
+Detection by error type (shipped, natives B):
+
+| error | detection |
+|---|---|
+| fall one mora early | 92.7% |
+| fall added | 83.2% |
+| fall moved two or more morae | 80.2% |
+| fall one mora late | 74.4% |
+| fall removed | 74.3% |
+
+The Gaussians miss 60% of late falls. Having learned connected speech's peak
+lag, they read a late fall as correct.
+
+### Reading
+
+- **Detection isn't the bottleneck.** Four of five wrong accents are caught,
+  and the error the learner made is named exactly 44% of the time.
+- **False alarms on correct native takes are the bottleneck:** 42% here,
+  about 36% on the original audio. The remaining work is accepting correct
+  speech more reliably, above all the spurious final fall on heiban words
+  (Round 5, "Not done").
+- **The learned table's apparent κ advantage** on natives (Round 4) comes
+  from accepting more of everything: its J is lower (24.0 vs 39.0).
+- The shipped-vs-previous gap on J (+1.2) is within the CIs.
+- **Hardest errors:** a fall one mora late, and a fall removed. Both are
+  closest to natural variation (peak delay; weak falls).
+
+### Caveats
+
+- The errors are synthetic. Real learners' errors may differ in size and
+  timing: the shifts follow CTC boundaries (about 40 ms late) and use a
+  native-sized fall.
+- WORLD harvest re-voices some devoiced vowels, which blunts the silent-mora
+  handling on this set.
+- The rater study is still what validates transfer to real learner errors.
+
 ## Conclusions and recommendations
 
 (Rounds 1–2 conclusions, updated by Round 3.)

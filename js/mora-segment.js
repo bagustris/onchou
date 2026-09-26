@@ -355,6 +355,85 @@
     return false;
   }
 
+  // ---- silent morae (a geminate closure, a devoiced high vowel) --------
+  //
+  // Some morae carry no F0 at all: the closure of a geminate っ, and a high
+  // vowel i/u devoiced between voiceless consonants (す in すき, く in
+  // ふそく). With equal time slots over the VOICED span, such a mora either
+  // lies outside that span (word-initial/-final: every other slot is then
+  // cut one mora out of place) or gets an empty or borrowed slot (medial:
+  // reported 'unclear' though the pattern is otherwise clear). When
+  // SILENT_MORAE is on and the caller passes morae, silent edge morae are
+  // left out of the voiced span's division, silent medial morae keep their
+  // share of time but no value, and every silent mora is shown at the level
+  // the decoded pattern gives it -- a listener hears a devoiced mora's pitch
+  // from its neighbours too.
+  //
+  // Devoicing rule: the voiceless-consonant rule from
+  // github.com/bagustris/ASR_JA_Vowel_Devoicing (JSUT phone_level3
+  // transcripts), on kana: i/u with a voiceless onset, followed by a
+  // voiceless onset (a geminate counts as the consonant it doubles) or
+  // word-final (DEVOICE_FINAL). Devoicing is assumed only if at least
+  // MIN_VOICED_MORAE morae (all of them, in shorter words) keep a voice:
+  // with two left, a 3-mora word is decoded from two values, where any edge
+  // artifact decides the pattern -- on accent-removed (monotone) natives-B
+  // resynthesis, allowing that raised false acceptance of 3-mora atamadaka
+  // words like てんき from 6.8% to 8.9%; requiring three keeps it at 7.1%.
+  //
+  // Checked against the audio (tools/paper-devoicing*.py): on JSUT, with
+  // every i/u vowel labelled by pYIN's voicing over its aligned segment, the
+  // rule scores F1 0.84 -- the same as the report's ASR model trained on the
+  // rule's labels, and above OpenJTalk's own devoicing (0.82) and above
+  // blocking consecutive devoicing (0.82). On UME-JRF isolated words the
+  // word-initial case is reliable and the word-final one word-dependent
+  // (あし ~always, ひかく rarely); confirming edge devoicing per take from
+  // voiceless energy beyond the voiced span, and dropping the final case,
+  // both scored LOWER on the choosing speakers than the plain rule. Chosen on
+  // UME natives A + JSUT app-like train (kappa 0.425 -> 0.458, 0.198 ->
+  // 0.250; 0.475 with MIN_VOICED_MORAE 2, rejected above); held-out results
+  // in the eval design doc's "Round 5".
+  var SILENT_MORAE = true;
+  var DEVOICE_FINAL = true;
+  var CONSECUTIVE_BLOCK = false; // research option: skip i/u right after a devoiced one
+  var MIN_VOICED_MORAE = 3; // devoicing is assumed only if this many morae (or all, if fewer) keep a voice
+  var FEW_VOICED = 'all'; // research option 'final-first': un-flag a final devoicing before the rest
+  var DEVOICEABLE = {};
+  var VOICELESS_ONSET = {};
+  (function () {
+    var d = 'きくしすちつひふぴぷキクシスチツヒフピプ', k;
+    for (k = 0; k < d.length; k++) DEVOICEABLE[d[k]] = 1;
+    ['きゅ', 'しゅ', 'ちゅ', 'ひゅ', 'ぴゅ', 'キュ', 'シュ', 'チュ', 'ヒュ', 'ピュ'].forEach(function (m) { DEVOICEABLE[m] = 1; });
+    var v = 'かきくけこさしすせそたちつてとはひふへほぱぴぷぺぽカキクケコサシスセソタチツテトハヒフヘホパピプペポ';
+    for (k = 0; k < v.length; k++) VOICELESS_ONSET[v[k]] = 1;
+  })();
+  var GEMINATE = { 'っ': 1, 'ッ': 1 };
+  function silentMorae(morae) {
+    var n = morae ? morae.length : 0, out = [], i, voiced = 0;
+    for (i = 0; i < n; i++) out.push(!!GEMINATE[morae[i]]);
+    for (i = 0; i < n; i++) {
+      if (out[i] || !DEVOICEABLE[morae[i]] || (CONSECUTIVE_BLOCK && i > 0 && out[i - 1] && !GEMINATE[morae[i - 1]])) continue;
+      var next = morae[i + 1];
+      if (next != null && GEMINATE[next]) next = morae[i + 2];
+      if (next == null ? (DEVOICE_FINAL && i === n - 1) : !!VOICELESS_ONSET[next.charAt(0)]) out[i] = 'devoiced';
+    }
+    // Guard: devoicing is kept only if at least MIN_VOICED_MORAE morae (all
+    // of them, in shorter words) still have a voice; otherwise every
+    // devoicing flag is dropped (geminates stay silent). The research mode
+    // FEW_VOICED 'final-first' first tries dropping just a word-final flag.
+    var need = Math.min(n, MIN_VOICED_MORAE);
+    for (i = 0; i < n; i++) if (!out[i]) voiced++;
+    if (FEW_VOICED === 'final-first' && voiced < need && n > 0 && out[n - 1] === 'devoiced') { out[n - 1] = false; voiced++; }
+    if (voiced < need) for (i = 0; i < n; i++) if (out[i] === 'devoiced') out[i] = false;
+    return out.map(Boolean);
+  }
+
+  // The silent mask segmentByMora actually uses (null when SILENT_MORAE is
+  // off or morae don't match) -- research tools pass it to computeSlots so
+  // exported slot windows are the production ones.
+  function silentFor(morae, moraCount) {
+    return SILENT_MORAE && morae && morae.length === moraCount ? silentMorae(morae) : null;
+  }
+
   function decodeAccentPattern(slotMedians, opts) {
     opts = opts || {};
     var n = slotMedians.length;
@@ -398,6 +477,9 @@
       else return labels;
     }
     for (i = 0; i < idx.length; i++) labels[idx[i]] = winner.t[idx[i]] ? 'H' : 'L';
+    // opts.silent: morae known to carry no F0 (see silentMorae) take the
+    // level the winning pattern gives them instead of 'unclear'.
+    if (opts.silent) for (i = 0; i < n; i++) if (opts.silent[i]) labels[i] = winner.t[i] ? 'H' : 'L';
     return labels;
   }
 
@@ -473,7 +555,11 @@
   // segmentByMora (voice gate -> voiced span -> equal slots read
   // PEAK_DELAY_MS late -> per-slot median Hz), split out so research tools
   // can try alternative decoders on EXACTLY the production slot values.
-  function computeSlots(trace, moraCount) {
+  // silent (optional, [bool] per mora; see silentMorae): leading/trailing
+  // silent morae get zero-width slots at the span's edges and the voiced
+  // span is divided among the rest; medial silent morae keep their share of
+  // time but no value (null).
+  function computeSlots(trace, moraCount, silent) {
     var gated = gateQuietFrames(trace || []);
     var voiced = gated.filter(function (f) { return f && f.hz != null; });
     if (!voiced.length) return null;
@@ -484,8 +570,15 @@
       if (voiced[v].tMs < spanStart) spanStart = voiced[v].tMs;
       if (voiced[v].tMs > spanEnd) spanEnd = voiced[v].tMs;
     }
+    var lead = 0, trail = 0;
+    if (silent && silent.length === moraCount) {
+      while (lead < moraCount && silent[lead]) lead++;
+      while (trail < moraCount - lead && silent[moraCount - 1 - trail]) trail++;
+    }
+    var inner = moraCount - lead - trail;
+    if (inner < 1) { lead = 0; trail = 0; inner = moraCount; }
     var span = spanEnd - spanStart;
-    var width = span / moraCount;
+    var width = span / inner;
     // Never delay by more than half a slot: on an implausibly short span
     // the fixed delay would otherwise push most frames out of every slot.
     var delay = Math.min(PEAK_DELAY_MS, width / 2);
@@ -495,7 +588,10 @@
     var slotHz = [], slotT = [], slotBounds = [];
     for (var s = 0; s < moraCount; s++) {
       slotHz.push([]); slotT.push([]);
-      slotBounds.push([spanStart + delay + s * width, s === moraCount - 1 ? spanEnd : spanStart + delay + (s + 1) * width]);
+      if (s < lead) { slotBounds.push([spanStart, spanStart]); continue; }
+      if (s >= lead + inner) { slotBounds.push([spanEnd, spanEnd]); continue; }
+      var q = s - lead;
+      slotBounds.push([spanStart + delay + q * width, q === inner - 1 ? spanEnd : spanStart + delay + (q + 1) * width]);
     }
 
     for (var f = 0; f < voiced.length; f++) {
@@ -507,17 +603,18 @@
         // by zero.
         slotIndex = 0;
       } else {
-        var pos = ((frame.tMs - spanStart - delay) / span) * moraCount;
+        var pos = ((frame.tMs - spanStart - delay) / span) * inner;
         if (pos < 0) continue; // before the first (delayed) window
         slotIndex = Math.floor(pos);
-        if (slotIndex >= moraCount) slotIndex = moraCount - 1;
+        if (slotIndex >= inner) slotIndex = inner - 1;
+        slotIndex += lead;
       }
       slotHz[slotIndex].push(frame.hz);
       slotT[slotIndex].push(frame.tMs);
     }
 
     return {
-      slotMedians: slotHz.map(function (hz, k) { return slotValue(hz, slotT[k], slotBounds[k]); }),
+      slotMedians: slotHz.map(function (hz, k) { return silent && silent[k] ? null : slotValue(hz, slotT[k], slotBounds[k]); }),
       spanStart: spanStart, spanEnd: spanEnd, slots: slotBounds, overallMedian: overallMedian,
     };
   }
@@ -575,13 +672,14 @@
     opts = opts || {};
     if (!moraCount || moraCount < 1) return { pattern: [] };
 
-    var c = computeSlots(trace, moraCount);
+    var silent = silentFor(opts.morae, moraCount);
+    var c = computeSlots(trace, moraCount, silent);
     if (!c) {
       var pattern = [];
       for (var i = 0; i < moraCount; i++) pattern.push('unclear');
       return { pattern: pattern, spanStart: null, spanEnd: null, slots: null, overallMedian: null };
     }
-    var result = decodeAccentPattern(c.slotMedians, { heavyInitial: heavyInitial(opts.morae) });
+    var result = decodeAccentPattern(c.slotMedians, { heavyInitial: heavyInitial(opts.morae), silent: silent });
     // opts.useModel === true: once the guard has accepted the take, the
     // learned table picks the pattern (see learnedPattern -- opt-in only).
     // No-data slots stay 'unclear'.
@@ -636,6 +734,8 @@
     _decodeAccentPattern: decodeAccentPattern, // exposed for testing
     _gateQuietFrames: gateQuietFrames, // exposed for testing
     _heavyInitial: heavyInitial, // exposed for testing
+    _silentMorae: silentMorae, // exposed for testing
+    _silentFor: silentFor, // exposed for research tools (production slot windows)
     _computeSlots: computeSlots, // exposed for research tools (alternative decoders on production slots)
     _learnedPattern: learnedPattern, // exposed for testing
     _hasModel: !!(ACCENT_MODEL && ACCENT_MODEL.models),
