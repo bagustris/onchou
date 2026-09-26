@@ -416,13 +416,22 @@
       if (next != null && GEMINATE[next]) next = morae[i + 2];
       if (next == null ? (DEVOICE_FINAL && i === n - 1) : !!VOICELESS_ONSET[next.charAt(0)]) out[i] = 'devoiced';
     }
-    // Fewer than two voiced morae leaves nothing to decode: give the final
-    // mora its voice back first (the least reliable case), then all.
+    // Guard: devoicing is kept only if at least MIN_VOICED_MORAE morae (all
+    // of them, in shorter words) still have a voice; otherwise every
+    // devoicing flag is dropped (geminates stay silent). The research mode
+    // FEW_VOICED 'final-first' first tries dropping just a word-final flag.
     var need = Math.min(n, MIN_VOICED_MORAE);
     for (i = 0; i < n; i++) if (!out[i]) voiced++;
     if (FEW_VOICED === 'final-first' && voiced < need && n > 0 && out[n - 1] === 'devoiced') { out[n - 1] = false; voiced++; }
     if (voiced < need) for (i = 0; i < n; i++) if (out[i] === 'devoiced') out[i] = false;
     return out.map(Boolean);
+  }
+
+  // The silent mask segmentByMora actually uses (null when SILENT_MORAE is
+  // off or morae don't match) -- research tools pass it to computeSlots so
+  // exported slot windows are the production ones.
+  function silentFor(morae, moraCount) {
+    return SILENT_MORAE && morae && morae.length === moraCount ? silentMorae(morae) : null;
   }
 
   function decodeAccentPattern(slotMedians, opts) {
@@ -663,7 +672,7 @@
     opts = opts || {};
     if (!moraCount || moraCount < 1) return { pattern: [] };
 
-    var silent = SILENT_MORAE && opts.morae && opts.morae.length === moraCount ? silentMorae(opts.morae) : null;
+    var silent = silentFor(opts.morae, moraCount);
     var c = computeSlots(trace, moraCount, silent);
     if (!c) {
       var pattern = [];
@@ -726,6 +735,7 @@
     _gateQuietFrames: gateQuietFrames, // exposed for testing
     _heavyInitial: heavyInitial, // exposed for testing
     _silentMorae: silentMorae, // exposed for testing
+    _silentFor: silentFor, // exposed for research tools (production slot windows)
     _computeSlots: computeSlots, // exposed for research tools (alternative decoders on production slots)
     _learnedPattern: learnedPattern, // exposed for testing
     _hasModel: !!(ACCENT_MODEL && ACCENT_MODEL.models),

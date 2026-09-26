@@ -59,7 +59,7 @@ for (const [vname, dir] of Object.entries(variants)) {
     rows[vname + '|' + sys] = acc;
   }
   if (dir) for (const s of set) {
-    const c = MS._computeSlots(s.trace, s.moraCount);
+    const c = MS._computeSlots(s.trace, s.moraCount, MS._silentFor(s.morae, s.moraCount)); // production windows
     if (!c) continue;
     exportRows.push({ split: 'flat.' + vname, wav: path.join(ROOT, 'flat', dir, rel(s)), moraCount: s.moraCount, accents: s.accents, noFall: isNoFall(s),
       slots: c.slots.map(([a, b]) => [a / 1000, b / 1000]) });
@@ -74,3 +74,7 @@ for (const sys of Object.keys(systems)) {
   console.log(sys.padEnd(34) + Object.keys(variants).map((v) => { const r = rows[v + '|' + sys]; return `${pct(r.ac)} / ${pct(r.nf)}`.padEnd(26); }).join(''));
 }
 console.log('\n(accented-target acceptance on flat/decl = false acceptance of a take with NO accent)');
+// The shipped decoder's operating points on accented targets, read by
+// tools/paper-pasqa.py to threshold PASQA at the same false acceptance.
+const op = (v) => { const r = rows[v + '|proposed (model-free, shipped)'].ac; return r[0] / r[1]; };
+fs.writeFileSync(path.join(__dirname, 'tmp', 'paper-flat-rates.json'), JSON.stringify({ copy: op('copy'), 'flat.flat': op('flat'), 'flat.decl': op('decl') }, null, 2));

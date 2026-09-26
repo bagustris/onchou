@@ -4,7 +4,8 @@ Set D natives, onchou's actual input), mora by mora.
 
 Mora intervals come from the CTC forced aligner (tools/paper-fa.py ->
 tools/tmp/umejrf-fa.json; coarse, ~+40ms late vs Julius on JSUT), the voiced
-share of each from WORLD harvest. For every devoiceable mora (i/u vowel with
+share of each from pYIN (librosa; WORLD harvest over-voices devoiced vowels,
+see tools/paper-devoicing.py). For every devoiceable mora (i/u vowel with
 a voiceless onset) it reports how often it is acoustically devoiced, split
 by the kana rule's verdict and by position, so the rule's word-final case
 (from utterances like です, where it is near-categorical) can be checked on

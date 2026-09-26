@@ -834,6 +834,77 @@ no-fall 52.4% → 56.8%.
 - The biggest remaining native error is the spurious final fall on heiban
   words, especially heavy-initial ones.
 
+## Round 6: error detection on resynthesized wrong-accent takes (no raters; 2026-09-27)
+
+### Method (`tools/paper-swap.py`, `tools/paper-exp-swap.js`)
+
+Each native take of a single-accent word (UME natives A and B, 3,298 takes)
+is resynthesized with WORLD. The voice, timing and F0 micro-prosody stay the
+native speaker's own, but the accent is moved to every other valid shape.
+Morae whose level differs are shifted by the speaker's typical accent fall
+(the median H−L gap over that speaker's accented takes, 217–523 cents), with
+40 ms ramps at CTC mora boundaries. That gives 6,992 wrong takes with a
+known produced pattern. Each take also goes through the same code with zero
+shift ('selfswap'), a correct control with the identical vocoder round trip.
+
+A first pass used each take's own gap instead. That was wrong: a heiban
+take's own gap is only its initial rise (median −4 cents), so fall-added
+errors were synthesized at the 100-cent floor and too often accepted.
+
+Decision per take: accept (decoded pattern equals the target), abstain
+(all 'unclear'), or flag. **Detection** is the share of wrong takes not
+accepted. **False alarm** is the share of correct takes not accepted.
+**Youden's J** is detection minus false alarm, so rejecting everything
+scores 0. **Diagnosis** is the share of wrong takes decoded as exactly the
+produced pattern.
+
+### Results, natives B (reporting; speaker-bootstrap 95% CIs)
+
+| system | J | detection | false alarm | exact diagnosis |
+|---|---|---|---|---|
+| proposed (shipped) | **39.0** [31.4, 45.3] | 81.0 [78.7, 83.3] | 42.0 [36.6, 48.0] | **44.0** [40.8, 47.1] |
+| proposed without silent morae | 37.8 [30.7, 43.9] | 83.5 | 45.8 | 43.2 |
+| F0-ratio Gaussians (JSUT-trained), forced choice | 24.0 [19.1, 29.3] | 52.2 | 28.2 | 23.9 |
+
+On natives A (choosing), the shipped decoder scores J 52.0, detection 83.8
+and false alarm 31.8.
+
+Detection by error type (shipped, natives B):
+
+| error | detection |
+|---|---|
+| fall one mora early | 92.7% |
+| fall added | 83.2% |
+| fall moved two or more morae | 80.2% |
+| fall one mora late | 74.4% |
+| fall removed | 74.3% |
+
+The Gaussians miss 60% of late falls. Having learned connected speech's peak
+lag, they read a late fall as correct.
+
+### Reading
+
+- **Detection isn't the bottleneck.** Four of five wrong accents are caught,
+  and the error the learner made is named exactly 44% of the time.
+- **False alarms on correct native takes are the bottleneck:** 42% here,
+  about 36% on the original audio. The remaining work is accepting correct
+  speech more reliably, above all the spurious final fall on heiban words
+  (Round 5, "Not done").
+- **The learned table's apparent κ advantage** on natives (Round 4) comes
+  from accepting more of everything: its J is lower (24.0 vs 39.0).
+- The shipped-vs-previous gap on J (+1.2) is within the CIs.
+- **Hardest errors:** a fall one mora late, and a fall removed. Both are
+  closest to natural variation (peak delay; weak falls).
+
+### Caveats
+
+- The errors are synthetic. Real learners' errors may differ in size and
+  timing: the shifts follow CTC boundaries (about 40 ms late) and use a
+  native-sized fall.
+- WORLD harvest re-voices some devoiced vowels, which blunts the silent-mora
+  handling on this set.
+- The rater study is still what validates transfer to real learner errors.
+
 ## Conclusions and recommendations
 
 (Rounds 1–2 conclusions, updated by Round 3.)

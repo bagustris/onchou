@@ -27,8 +27,8 @@ Run in PASQA's own environment (Python 3.10, pinned torch/s3prl):
   git clone https://github.com/lycorp-jp/PASQA && cd PASQA && uv sync
   # download checkpoint-100000steps.pkl + config.yml into pretrained/
   PASQA_DIR=... .venv/bin/python /path/to/onchou/tools/paper-pasqa.py
-Needs tools/tmp/slots-export.jsonl and flat-export.jsonl (tools/paper-
-export-slots.js, tools/paper-exp-flat.js).
+Needs tools/tmp/slots-export.jsonl, flat-export.jsonl and paper-flat-rates.json
+(tools/paper-export-slots.js, tools/paper-exp-flat.js).
 """
 import json, os, sys, collections
 import numpy as np
@@ -89,8 +89,11 @@ for s in flat:
     by[s['split']].append(score(s['wav'], morae_of[s['wav'].split('/flat/')[1].split('/', 1)[1]]))
 copy = by['flat.copy']
 print(f"\nT1 accent-removed detection (natives B, accented targets; n={len(copy)} per condition)")
-# the proposed decoder's operating point on the same words (tools/paper-exp-flat.js, corrected run)
-ours = {'copy': 0.611, 'flat.flat': 0.068, 'flat.decl': 0.142}
+# the shipped decoder's operating point on the same words, as last measured
+# by tools/paper-exp-flat.js (run it first after any decoder change)
+ours = json.load(open(os.path.join(TMP, 'paper-flat-rates.json')))
+print(f"  shipped decoder operating point: accepts {100*ours['copy']:.1f}% of correct words, "
+      f"false acceptance flat {100*ours['flat.flat']:.1f}% / drifting {100*ours['flat.decl']:.1f}%")
 for neg in ('flat.flat', 'flat.decl'):
     a = auc(copy, by[neg])
     thr = np.quantile(by[neg], 1 - ours[neg])  # PASQA threshold giving the SAME false acceptance as ours
