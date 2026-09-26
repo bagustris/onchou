@@ -337,9 +337,10 @@ cents/mora for words of 3+ morae but stays 50 for 2-mora words, where a
 slope and a rise explain the same single difference (a wider bound let 16%
 of flat 2-mora takes with jitter pass); (3) window delay 20ms (isolated-word
 optimum on UME-JRF natives). A realistic monotone test (natives' own words
-resynthesized with no accent) found the proposed guard accepts 8.8% of
-accentless accented words (17% with declining drift) vs 21-26% for
-forced-choice learned scorers. A learned pattern table (js/accent-model.js)
+resynthesized with no accent) found the proposed guard accepts 6.8% of
+accentless accented words (14.2% with declining drift) vs 15-16% for a
+JSUT-trained F0-ratio classifier, 15-22% for WavLM and 34-44% for a
+Japanese HuBERT scorer (forced choice). A learned pattern table (js/accent-model.js)
 was built and kept OPT-IN: learned from connected speech, it misreads
 on-time steps by one mora.
 

@@ -214,6 +214,10 @@ console.log('');
 // (so it can't win by learning the corpus's skewed pattern frequencies).
 // Answers: how much accent information do these same per-mora features
 // carry when the decision rule is learned rather than hand-specified?
+// v: per-mora values in LOG2 Hz (every moraValue() path in
+// tools/accent-decoders.js returns Math.log2(...)), so 1200 * (a difference
+// of log2 values) below IS a cents step -- the same feature as
+// tools/paper-exp-learned-lib.js, which converts from Hz itself.
 function f0ratios(v) {
   const n = v.length;
   const present = [];

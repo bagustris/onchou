@@ -30,7 +30,10 @@ const systems = {
   'original 2-cluster': (() => { const V = H.variant({ VOICE_GATE_DB: 999, PEAK_DELAY_MS: 0 }); return (s) => { const c = V._computeSlots(s.trace, s.moraCount); return c ? V._classifyLevels(c.slotMedians) : new Array(s.moraCount).fill('unclear'); }; })(),
 };
 const rel = (s) => { const [site, spk] = s.speaker.split('/'); return path.join(s.group, site, spk, `D1_${String(s.wordIdx).padStart(3, '0')}.wav`); };
-const isNoFall = (s) => s.accents.every((a) => { const p = PD.pitchLevels(s.moraCount, a).slice(0, s.moraCount); return p.lastIndexOf('H') === s.moraCount - 1 && p[0] === 'L'; });
+// A word counts as no-fall if ANY accepted accent has that shape (e.g. 白檀
+// [2,0], 銅貨 [1,0]): a flat take matching its accepted no-fall variant is
+// not a false acceptance. Same rule as paper-exp-decl.js's accented().
+const isNoFall = (s) => s.accents.some((a) => { const p = PD.pitchLevels(s.moraCount, a).slice(0, s.moraCount); return p.lastIndexOf('H') === s.moraCount - 1 && p[0] === 'L'; });
 
 const variants = { original: null, copy: 'copy', flat: 'flat', decl: 'decl' };
 const exportRows = [];

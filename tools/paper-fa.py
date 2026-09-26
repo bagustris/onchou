@@ -45,6 +45,10 @@ def mora_tokens(mora, prev_vowel):
     if m == 'っ': return ['ʔ'], prev_vowel
     if m == 'ー': return [VOW[prev_vowel]], prev_vowel
     c, v = BASE[m[0]]
+    # The eSpeak CTC vocabulary spells /g/ with the IPA letter ɡ (U+0261) and
+    # has no ASCII 'g': without this, every が-row mora raised KeyError and
+    # all 12 such words were silently dropped as "alignment failures".
+    if c == 'g': c = '\u0261'
     if len(m) > 1 and m[1] in SMALL:  # yōon
         v = SMALL[m[1]]
         cons = PALATAL.get(c, ([c, 'j'] if c else ['j']))

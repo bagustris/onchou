@@ -111,6 +111,10 @@
   $('next').onclick = function () { record(labels.join('')); };
   document.addEventListener('keydown', function (e) {
     if ($('task').hidden) return;
+    // Leave native keyboard activation alone on focused controls: Space/Enter
+    // on a mora button must toggle THAT mora, not replay or advance.
+    var t = e.target && e.target.tagName;
+    if (t === 'BUTTON' || t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
     if (e.key === ' ') { e.preventDefault(); $('play').click(); }
     if (e.key === 'Enter' && !$('next').disabled) $('next').click();
   });
