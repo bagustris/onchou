@@ -785,7 +785,9 @@
     if (tf < 0) { out.verdict = 'extra-fall'; out.message = 'Your pitch fell after ' + name(lf) + ' -- ' + shouldTxt + '. Keep it level.'; return out; }
     var d = lf - tf;
     out.verdict = d > 0 ? 'fall-late' : 'fall-early';
-    out.message = 'Your pitch fell after ' + name(lf) + ' -- ' + shouldTxt + ' (' + Math.abs(d) + ' mora' + (Math.abs(d) > 1 ? 'e' : '') + (d > 0 ? ' earlier' : ' later') + ').';
+    // Phrased as the action to take, so the direction can't be misread:
+    // the learner fell late (d > 0) -> move the fall earlier, and vice versa.
+    out.message = 'Your pitch fell after ' + name(lf) + ' -- ' + shouldTxt + ': move the fall ' + Math.abs(d) + ' mora' + (Math.abs(d) > 1 ? 'e' : '') + (d > 0 ? ' earlier' : ' later') + '.';
     return out;
   }
 

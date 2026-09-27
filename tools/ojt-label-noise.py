@@ -22,7 +22,6 @@ LAB = LAB if os.path.exists(os.path.join(LAB, 'BASIC5000_0001.lab')) else os.pat
 
 
 def shape(n, a):
-    if a == 0 or a == n and False: pass
     if a == 0: return 'L' + 'H' * (n - 1)
     if a == 1: return 'H' + 'L' * (n - 1)
     return 'L' + ''.join('H' if i < a else 'L' for i in range(1, n))

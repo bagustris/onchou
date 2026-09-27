@@ -164,7 +164,7 @@ function flatFA(set, fn) { // accented-target words scored correct on flat/decl 
       acc[v][1]++; if (s.accents.some((a) => shapeOf(s.moraCount, a) === p)) acc[v][0]++;
     }
   }
-  return { flat: acc.flat[0] / acc.flat[1], decl: acc.decl[0] / acc.decl[1], copy: acc.copy[0] / acc.copy[1] };
+  return { flat: acc.flat[0] / acc.flat[1], decl: acc.decl[0] / acc.decl[1], copy: acc.copy[0] / acc.copy[1], counts: acc };
 }
 function swapJ(set, fn) {
   const rels = new Set(set.map(relOf));
@@ -216,8 +216,8 @@ for (const tau of TAUS) {
   for (const { m, te } of cvRows) {
     const fn = predictor(m, tau);
     for (const s of te) items.push(s);
-    const r = flatFA(te, fn), nAcc = te.filter((s) => s.moraCount >= 2).length;
-    fa.flat[0] += r.flat * nAcc; fa.flat[1] += nAcc; fa.decl[0] += r.decl * nAcc; fa.decl[1] += nAcc;
+    const r = flatFA(te, fn).counts; // pool the counts over folds (accented-target words only)
+    for (const v of ['flat', 'decl']) { fa[v][0] += r[v][0]; fa[v][1] += r[v][1]; }
   }
   const byS = new Map(); for (const { m, te } of cvRows) for (const s of te) byS.set(s, predictor(m, tau)(s));
   const k = H.metrics(items, (s) => byS.get(s));

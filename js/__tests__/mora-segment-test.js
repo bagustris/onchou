@@ -377,7 +377,9 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
   eq('unclear before the only L: could have been the high one', v(['L', 'unclear', 'L'], ['L', 'H', 'L']), 'unclear');
   eq('unclear first mora does not block a judgement', v(['unclear', 'H', 'L'], ['L', 'H', 'L']), 'correct');
   eq('message names the mora with its kana', ff(['L', 'H', 'H', 'L'], ['L', 'H', 'L', 'L'], ['び', 'よ', 'う', 'い']).message,
-    'Your pitch fell after mora 3 「う」 -- it should fall right after mora 2 「よ」 (1 mora earlier).');
+    'Your pitch fell after mora 3 「う」 -- it should fall right after mora 2 「よ」: move the fall 1 mora earlier.');
+  eq('early fall: advice says move it later', ff(['H', 'L', 'L'], ['L', 'H', 'L']).message,
+    'Your pitch fell after mora 1 -- it should fall right after mora 2: move the fall 1 mora later.');
   eq('particle mode: odaka fall onto が is named', ff(['L', 'H', 'L'], ['L', 'H', 'L'], ['は', 'し', 'が']).message, 'Right: your pitch fell after mora 2 「し」.');
 }
 

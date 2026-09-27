@@ -917,7 +917,7 @@ A only.
 |---|---|---|---|---|---|---|---|
 | shipped model-free | 0.388 | 0.126 | 0.278 | **39.0** | **7.1%** | **14.6%** | **100%** |
 | LR, natives only | **0.569** | **0.216** | 0.152 | 35.0 | 10.9% | 20.1% | 56% |
-| LR + accent-swap and flat augmentation | 0.143 | 0.054 | 0.040 | 11.8 | 10.1% | 11.3% | 6% |
+| LR + accent-swap and flat augmentation | 0.156 | 0.065 | 0.057 | 13.6 | 10.8% | 12.0% | 11% |
 | guarded hybrid (shipped guard, LR picks the pattern) | 0.411 | 0.153 | 0.170 | 29.8 | 10.2% | 16.8% | 56% |
 
 - **The natives-only model is the familiar trap.** Trained on native words,
@@ -926,9 +926,9 @@ A only.
   and misreads 44% of clean on-time synthetic words. The same happened with
   the JSUT-trained Gaussians (Round 6).
 - **Augmenting with WORLD accent swaps and flat takes fails.** The model
-  learns the resynthesis rather than the accent: it scores 6% on clean
+  learns the resynthesis rather than the accent: it scores 11% on clean
   synthetic words, and on words not seen in training it scores κ 0.01.
-- **The flat-rejection threshold (TAU = 0.7) was chosen on natives A.**
+- **The flat-rejection threshold (TAU = 0.6) was chosen on natives A.**
   Speaker-grouped cross-validation, best κ with flat and drift false
   acceptance no higher than the shipped decoder's.
 - **Verdict: keep the model-free decoder.** A higher κ against native
@@ -1031,7 +1031,9 @@ production slots, decoding constrained to the valid patterns.
 The result's headline is now one sentence about the fall, for example:
 
 - "Your pitch fell after mora 3 「う」 -- it should fall right after mora 2
-  「よ」 (1 mora earlier)."
+  「よ」: move the fall 1 mora earlier." The advice is phrased as an action,
+  because "(1 mora earlier)" was read by a reviewer as describing the
+  learner's fall rather than the target's.
 - "Your pitch didn't fall -- …"
 - "Your pitch fell after … -- this word stays high to the end, with no
   fall. Keep it level."
@@ -1045,7 +1047,7 @@ stay underneath as detail.
 
 Rationale (Round 6): the decoder names a misplaced fall's exact position
 far more reliably than it gets every mora's level right. A learner acts on
-"one mora earlier", not on "2 of 4 matched".
+"move the fall one mora earlier", not on "2 of 4 matched".
 
 ## Conclusions and recommendations
 
