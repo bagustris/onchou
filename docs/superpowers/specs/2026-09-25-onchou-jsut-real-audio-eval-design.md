@@ -958,8 +958,44 @@ A only.
   against UME's 130, so the TV segments carry music or other speech around
   the phrase.
 - **Not usable without speech separation and alignment.** LaboroTV also
-  has no speaker ids. JVS (100 clean studio speakers) would be the right
-  corpus; it isn't on this machine.
+  has no speaker ids. JVS (100 clean studio speakers) is the right corpus;
+  see the next section.
+
+### #6 redone with JVS: 98 speakers, manual labels (`tools/build-jvs-set.js`)
+
+JVS's nonpara30 recordings include 3,071 readings of JSUT basic5000
+sentences by its 100 professional speakers. jsut-label's manual accents are
+combined with JVS's automatic phone alignments, which exist for 1,804
+recordings. 429 of those were skipped because the automatic reading differs,
+for example なに vs なん. That leaves 2,750 app-like phrases (first and last
+phrase with real silence) from 98 speakers, all held out. The labels are
+the JSUT speaker's accents, so another speaker may occasionally use a
+different accepted accent.
+
+The labels match the audio: median adjacent-slot steps are −457 cents on
+HLL's second step and +207 on LHH's first. Compare LaboroTV's ≈0.
+
+| system | JVS κ [speaker-bootstrap CI] | strict | unclear |
+|---|---|---|---|
+| original 2-cluster | 0.009 [−0.003, 0.020] | 9.5% | 0.5% |
+| shipped without silent morae | 0.128 [0.111, 0.147] | 28.3% | 8.4% |
+| **shipped** | **0.178** [0.157, 0.200] | 34.5% | 6.6% |
+| JSUT-trained Gaussians (connected speech, lag learned) | 0.316 [0.293, 0.336] | 47.7% | 0.4% |
+
+**Silent morae generalize across speakers** (+0.05).
+
+**The peak delay depends on speaking style, across 98 speakers** (a
+descriptive sweep; nothing was re-tuned):
+
+| delay | 0 | 20 (shipped) | 40 | 60 | 80 | 100 |
+|---|---|---|---|---|---|---|
+| JVS (connected, 98 speakers) | 0.146 | 0.178 | 0.234 | 0.267 | 0.269 | 0.270 |
+| JSUT app-like test (connected, 1 speaker) | 0.226 | 0.278 | 0.342 | 0.365 | 0.378 | 0.377 |
+| UME natives B (isolated words, 16 speakers) | 0.359 | **0.388** | 0.366 | 0.320 | 0.280 | 0.268 |
+
+Connected read speech wants 60–100 ms and isolated words 20 ms, now shown
+on 98 speakers rather than one. The app's input is isolated words, so 20 ms
+stays.
 
 ### #7 Fall-first feedback (`MoraSegment.fallFeedback`, `js/app.js`) -- SHIPPED
 
