@@ -239,6 +239,20 @@
   var MIN_RISE_CENTS = 100;
   var MIN_RISE_HEAVY_CENTS = 0;
   var FALLBACK_TO_NO_FALL = true;
+  // Research knobs for native heiban words misread as accented (off = the
+  // values above; see the eval design doc's "Round 8"):
+  //   MIN_SPLIT_HEAVY_HEAD_CENTS: evidence an atamadaka fall (after mora 1)
+  //     needs on a heavy-initial word, whose heiban reading starts high and
+  //     declines -- a real atamadaka falls much further inside the syllable.
+  //   RISE_WAIVE_VOICELESS_INITIAL: waive the initial-rise requirement when
+  //     mora 1 is a devoicing candidate (i/u after a voiceless consonant,
+  //     before one), where the rise sits on a voiceless mora and can't be
+  //     heard -- the same reasoning as the heavy-syllable waiver.
+  //   FINAL_DROP_CAP_CENTS: phrase-final lowering; up to this much of a drop
+  //     onto the word's last mora is treated as final lowering, not accent.
+  var MIN_SPLIT_HEAVY_HEAD_CENTS = 100;
+  var RISE_WAIVE_VOICELESS_INITIAL = false;
+  var FINAL_DROP_CAP_CENTS = 0;
 
   // Every valid Tokyo pattern over n slots as 0/1 arrays (1 = H): no drop
   // inside the slots (heiban/odaka, L,H,...,H), atamadaka (H,L,...,L), and a
@@ -427,6 +441,16 @@
     return out.map(Boolean);
   }
 
+  // voicelessInitial(morae) -> true when mora 1 is a devoicing candidate by
+  // the kana rule (i/u after a voiceless consonant, before a voiceless onset),
+  // whether or not silentMorae ends up treating it as silent.
+  function voicelessInitial(morae) {
+    if (!morae || morae.length < 2 || !DEVOICEABLE[morae[0]]) return false;
+    var next = morae[1];
+    if (GEMINATE[next]) next = morae[2];
+    return next != null && !!VOICELESS_ONSET[next.charAt(0)];
+  }
+
   // The silent mask segmentByMora actually uses (null when SILENT_MORAE is
   // off or morae don't match) -- research tools pass it to computeSlots so
   // exported slot windows are the production ones.
@@ -441,6 +465,12 @@
     for (i = 0; i < n; i++) { labels.push('unclear'); if (slotMedians[i] != null) idx.push(i); }
     if (n < 2 || idx.length < 2) return labels;
     var y = idx.map(function (k) { return Math.log2(slotMedians[k]); });
+    // Final lowering (FINAL_DROP_CAP_CENTS): a drop onto the last mora is
+    // discounted by up to the cap before fitting.
+    if (FINAL_DROP_CAP_CENTS > 0 && idx.length >= 2 && idx[idx.length - 1] === n - 1 && idx[idx.length - 2] === n - 2) {
+      var dropOct = y[y.length - 2] - y[y.length - 1];
+      if (dropOct > 0) y[y.length - 1] += Math.min(dropOct, FINAL_DROP_CAP_CENTS / 1200);
+    }
     var x = idx.slice();
     // A declination slope and an accent step are only weakly separable in
     // short words: with two morae both explain the same single difference,
@@ -458,7 +488,7 @@
       if (constant) continue; // indistinguishable from "no contrast" on the present slots
       var fit = fitWithDeclination(y, x, t, bMin);
       if (!fit) continue;
-      var cand = { t: patterns[p], c: fit.c, sse: fit.sse, isNoFall: p === 0 };
+      var cand = { t: patterns[p], c: fit.c, sse: fit.sse, isNoFall: p === 0, isHead: p === 1 };
       if (p === 0) noFall = cand; // validPatterns() always lists the no-fall shape first
       if (!best || fit.sse < best.sse - 1e-15) best = cand;
     }
@@ -467,8 +497,9 @@
     // opts.minSplitCents / opts.minRiseCents override the module constants
     // (research tools only -- e.g. per-speaker calibration experiments).
     var minSplit = opts.minSplitCents != null ? opts.minSplitCents : MIN_SPLIT_CENTS;
-    var minRise = opts.heavyInitial ? MIN_RISE_HEAVY_CENTS : (opts.minRiseCents != null ? opts.minRiseCents : MIN_RISE_CENTS);
-    var need = winner.isNoFall ? minRise : minSplit;
+    var riseWaived = opts.heavyInitial || (RISE_WAIVE_VOICELESS_INITIAL && opts.voicelessInitial);
+    var minRise = riseWaived ? MIN_RISE_HEAVY_CENTS : (opts.minRiseCents != null ? opts.minRiseCents : MIN_RISE_CENTS);
+    var need = winner.isNoFall ? minRise : (winner.isHead && opts.heavyInitial ? Math.max(minSplit, MIN_SPLIT_HEAVY_HEAD_CENTS) : minSplit);
     if (1200 * winner.c < need) {
       // The best pattern's own contrast is too weak to trust. If it claimed
       // a FALL, the honest reading may still be "no fall here" -- the
@@ -679,7 +710,7 @@
       for (var i = 0; i < moraCount; i++) pattern.push('unclear');
       return { pattern: pattern, spanStart: null, spanEnd: null, slots: null, overallMedian: null };
     }
-    var result = decodeAccentPattern(c.slotMedians, { heavyInitial: heavyInitial(opts.morae), silent: silent });
+    var result = decodeAccentPattern(c.slotMedians, { heavyInitial: heavyInitial(opts.morae), voicelessInitial: voicelessInitial(opts.morae), silent: silent });
     // opts.useModel === true: once the guard has accepted the take, the
     // learned table picks the pattern (see learnedPattern -- opt-in only).
     // No-data slots stay 'unclear'.
@@ -802,6 +833,7 @@
     _heavyInitial: heavyInitial, // exposed for testing
     _silentMorae: silentMorae, // exposed for testing
     _silentFor: silentFor, // exposed for research tools (production slot windows)
+    _voicelessInitial: voicelessInitial, // exposed for testing
     _computeSlots: computeSlots, // exposed for research tools (alternative decoders on production slots)
     _learnedPattern: learnedPattern, // exposed for testing
     _hasModel: !!(ACCENT_MODEL && ACCENT_MODEL.models),

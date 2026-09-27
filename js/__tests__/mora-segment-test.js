@@ -383,5 +383,16 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
   eq('particle mode: odaka fall onto が is named', ff(['L', 'H', 'L'], ['L', 'H', 'L'], ['は', 'し', 'が']).message, 'Right: your pitch fell after mora 2 「し」.');
 }
 
+
+// -- voicelessInitial: mora 1 is a devoicing candidate (research knob input)
+{
+  const { _voicelessInitial: vi } = require('../mora-segment.js');
+  const split = (r) => require('../pitch-diagram.js').moraSplit(r);
+  eq('ひかく: ひ before か is a devoicing candidate', vi(split('ひかく')), true);
+  eq('きやく: き before や is not', vi(split('きやく')), false);
+  eq('すっぱい: す before a voiceless geminate is', vi(split('すっぱい')), true);
+  eq('かいこく: か has no high vowel', vi(split('かいこく')), false);
+}
+
 console.log(`mora-segment-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
