@@ -23,6 +23,7 @@
     playbackNote: document.getElementById('playback-note'),
     contourRow: document.getElementById('contour-row'),
     contourGraph: document.getElementById('contour-graph'),
+    fallFeedback: document.getElementById('fall-feedback'),
     moraFeedback: document.getElementById('mora-feedback'),
     scoreText: document.getElementById('score-text'),
     detectMessage: document.getElementById('detect-message'),
@@ -124,6 +125,9 @@
     els.learnerDiagram.innerHTML = '';
     els.contourRow.hidden = true;
     els.contourGraph.innerHTML = '';
+    els.fallFeedback.hidden = true;
+    els.fallFeedback.textContent = '';
+    els.fallFeedback.className = 'fall-feedback';
     els.moraFeedback.hidden = true;
     els.moraFeedback.innerHTML = '';
     els.scoreText.hidden = true;
@@ -604,6 +608,15 @@
         includeTrailing: particleModeForWord,
       });
     }
+
+    // Headline: where the pitch fell vs where it should (the accent IS the
+    // fall, and it's what the decoder reads most reliably -- see
+    // fallFeedback in js/mora-segment.js). The chips below stay as detail.
+    var fall = MoraSegment.fallFeedback(learnerPattern, targetPattern, morae);
+    els.fallFeedback.hidden = false;
+    els.fallFeedback.textContent = fall.message;
+    els.fallFeedback.className = 'fall-feedback ' +
+      (fall.verdict === 'correct' || fall.verdict === 'rise-only' ? 'good' : fall.verdict === 'unclear' ? '' : 'bad');
 
     els.moraFeedback.hidden = false;
     els.moraFeedback.innerHTML = score.perMora.map(function (status, i) {

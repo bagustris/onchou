@@ -726,9 +726,73 @@
     return { matched: matched, unclear: unclear, total: total, perMora: perMora };
   }
 
+  // ---- fall-location feedback -----------------------------------------
+  //
+  // The accent IS the fall: where the pitch drops (or that it doesn't) is
+  // what distinguishes Tokyo patterns, and it is also what the decoder
+  // measures most reliably -- on accent-swapped native takes it catches a
+  // misplaced fall far more often than it gets the phrase-initial rise
+  // right, and the initial rise is weak or absent in natives anyway (see
+  // heavyInitial). So the headline feedback names the fall, not a per-mora
+  // score: "your pitch fell after mora 3; it should fall after mora 2".
+  //
+  // fallFeedback(learnerPattern, targetPattern, morae) -> {
+  //   verdict: 'correct' | 'rise-only' | 'fall-early' | 'fall-late' |
+  //            'missing-fall' | 'extra-fall' | 'unclear',
+  //   learnerFall, targetFall: index of the last high mora before the drop
+  //     (-1 = no drop; null = can't tell because of unclear morae),
+  //   message: learner-facing sentence,
+  // }
+  // morae (optional): kana per mora, used to name morae in the message.
+  function fallIndex(p) {
+    var lastH = -1, i, sawUnclear = false;
+    for (i = 0; i < p.length; i++) {
+      if (p[i] === 'H') lastH = i;
+      else if (p[i] === 'L') {
+        if (lastH >= 0) return lastH === i - 1 ? lastH : null; // unclear between H and L: position unknown
+        if (sawUnclear) return null; // an unclear mora before this L may have been the high one
+      } else sawUnclear = true;
+    }
+    return -1;
+  }
+  function fallFeedback(learnerPattern, targetPattern, morae) {
+    var n = Math.min(learnerPattern.length, targetPattern.length);
+    var lp = learnerPattern.slice(0, n), tp = targetPattern.slice(0, n);
+    var tf = fallIndex(tp), lf = fallIndex(lp);
+    var name = function (i) {
+      var k = morae && morae[i] ? '「' + morae[i] + '」' : '';
+      return 'mora ' + (i + 1) + (k ? ' ' + k : '');
+    };
+    var out = { verdict: 'unclear', learnerFall: lf, targetFall: tf, message: '' };
+    var known = lp.filter(function (x) { return x !== 'unclear'; }).length;
+    if (lf === null || known < 2) {
+      out.message = "Couldn't tell exactly where your pitch fell -- some morae were unclear. Use ⇄ Compare to check by ear.";
+      return out;
+    }
+    var shouldTxt = tf < 0 ? 'this word stays high to the end, with no fall' : 'it should fall right after ' + name(tf);
+    if (lf === tf) {
+      var riseOk = lp[0] === 'unclear' || lp[0] === tp[0];
+      out.verdict = riseOk ? 'correct' : 'rise-only';
+      out.message = tf < 0
+        ? 'Right: your pitch stayed high with no fall.'
+        : 'Right: your pitch fell after ' + name(tf) + '.';
+      if (!riseOk) out.message += tp[0] === 'L'
+        ? ' The fall is in the right place; the first mora could start a little lower.'
+        : ' The fall is in the right place; the first mora should be the high one.';
+      return out;
+    }
+    if (lf < 0) { out.verdict = 'missing-fall'; out.message = "Your pitch didn't fall -- " + shouldTxt + '.'; return out; }
+    if (tf < 0) { out.verdict = 'extra-fall'; out.message = 'Your pitch fell after ' + name(lf) + ' -- ' + shouldTxt + '. Keep it level.'; return out; }
+    var d = lf - tf;
+    out.verdict = d > 0 ? 'fall-late' : 'fall-early';
+    out.message = 'Your pitch fell after ' + name(lf) + ' -- ' + shouldTxt + ' (' + Math.abs(d) + ' mora' + (Math.abs(d) > 1 ? 'e' : '') + (d > 0 ? ' earlier' : ' later') + ').';
+    return out;
+  }
+
   return {
     segmentByMora: segmentByMora,
     scorePattern: scorePattern,
+    fallFeedback: fallFeedback,
     _median: median, // exposed for testing
     _classifyLevels: classifyLevels, // retired from segmentByMora; kept for tools/pitch-accuracy-experiment.js and its tests
     _decodeAccentPattern: decodeAccentPattern, // exposed for testing

@@ -905,6 +905,83 @@ lag, they read a late fall as correct.
   handling on this set.
 - The rater study is still what validates transfer to real learner errors.
 
+## Round 7: learned models on isolated words, more voices, fall-first feedback (2026-09-27)
+
+### #5 A learned classifier trained on native isolated words (`tools/paper-exp-augment.js`) -- NOT shipped
+
+The model is multinomial logistic regression per mora count, 190 numbers in
+all, on production slot values (silent morae included), trained on natives
+A only.
+
+| system | natives B κ | learners κ | JSUT app test κ | swap J (B) | flat FA | drift FA | synthetic on-time |
+|---|---|---|---|---|---|---|---|
+| shipped model-free | 0.388 | 0.126 | 0.278 | **39.0** | **7.1%** | **14.6%** | **100%** |
+| LR, natives only | **0.569** | **0.216** | 0.152 | 35.0 | 10.9% | 20.1% | 56% |
+| LR + accent-swap and flat augmentation | 0.143 | 0.054 | 0.040 | 11.8 | 10.1% | 11.3% | 6% |
+| guarded hybrid (shipped guard, LR picks the pattern) | 0.411 | 0.153 | 0.170 | 29.8 | 10.2% | 16.8% | 56% |
+
+- **The natives-only model is the familiar trap.** Trained on native words,
+  it matches natives much better (κ +0.18). But it accepts more
+  accent-removed takes, catches fewer misplaced accents (J 35.0 vs 39.0),
+  and misreads 44% of clean on-time synthetic words. The same happened with
+  the JSUT-trained Gaussians (Round 6).
+- **Augmenting with WORLD accent swaps and flat takes fails.** The model
+  learns the resynthesis rather than the accent: it scores 6% on clean
+  synthetic words, and on words not seen in training it scores κ 0.01.
+- **The flat-rejection threshold (TAU = 0.7) was chosen on natives A.**
+  Speaker-grouped cross-validation, best κ with flat and drift false
+  acceptance no higher than the shipped decoder's.
+- **Verdict: keep the model-free decoder.** A higher κ against native
+  takes isn't evidence of a better tutor; the swap and flat checks are what
+  expose the difference.
+
+### #6 More voices from LaboroTVSpeech with OpenJTalk labels (`tools/build-ltv-set.py`, `tools/ojt-label-noise.py`) -- negative
+
+- **Label quality.** Against jsut-label's manual accents, OpenJTalk's
+  phrase shape agrees for 93% of 2-mora, 85% of 3–4-mora and about 60% of
+  6–7-mora phrases.
+- **The set.** 9,423 short single-phrase TV utterances (2–5 morae,
+  containing a kanji; no interjections). A first pass without the kanji
+  filter was dominated by laughter and onomatopoeia.
+- **Every system is at chance on it:**
+
+  | system | κ |
+  |---|---|
+  | shipped | 0.028 |
+  | shipped without silent morae | 0.033 |
+  | JSUT Gaussians | −0.008 |
+
+- **The pitch doesn't follow the labels.** The median adjacent-slot step is
+  about 0 cents whatever the label. UME natives, by contrast, show −448
+  cents for HL and +213 for LH.
+- **The voiced span isn't just the phrase.** It averages 245 ms per mora
+  against UME's 130, so the TV segments carry music or other speech around
+  the phrase.
+- **Not usable without speech separation and alignment.** LaboroTV also
+  has no speaker ids. JVS (100 clean studio speakers) would be the right
+  corpus; it isn't on this machine.
+
+### #7 Fall-first feedback (`MoraSegment.fallFeedback`, `js/app.js`) -- SHIPPED
+
+The result's headline is now one sentence about the fall, for example:
+
+- "Your pitch fell after mora 3 「う」 -- it should fall right after mora 2
+  「よ」 (1 mora earlier)."
+- "Your pitch didn't fall -- …"
+- "Your pitch fell after … -- this word stays high to the end, with no
+  fall. Keep it level."
+- "Right: your pitch fell after mora 2 「し」."
+
+A take whose fall is right but whose first mora isn't low counts as right,
+with a soft note. Tokyo speakers' initial rise is weak, and absent after a
+heavy syllable. When unclear morae hide the drop's position, the headline
+says so and points to ⇄ Compare. The per-mora chips and "N of M matched"
+stay underneath as detail.
+
+Rationale (Round 6): the decoder names a misplaced fall's exact position
+far more reliably than it gets every mora's level right. A learner acts on
+"one mora earlier", not on "2 of 4 matched".
+
 ## Conclusions and recommendations
 
 (Rounds 1–2 conclusions, updated by Round 3.)

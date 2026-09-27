@@ -641,8 +641,27 @@ button {
   color: var(--fg);
 }
 
-.score-text {
+/* Headline feedback: where the pitch fell (MoraSegment.fallFeedback). The
+   per-mora chips and the "N of M matched" line below it are the detail. */
+.fall-feedback {
   font-weight: bold;
+  margin: 0.8rem 0 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border-left: 4px solid var(--border);
+  text-align: left;
+}
+
+.fall-feedback.good {
+  border-left-color: var(--correct);
+}
+
+.fall-feedback.bad {
+  border-left-color: var(--incorrect);
+}
+
+.score-text {
+  font-size: 0.85rem;
   margin: 0.4rem 0;
 }
 

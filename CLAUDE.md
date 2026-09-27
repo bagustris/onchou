@@ -162,6 +162,10 @@ dependency order, each an IIFE-scoped global:
    + score the learner's attempt against the target), owns the settings
    dialog and PWA install prompt, and drives
    `#unsupported-notice` / `#quiz` visibility via `PitchDetect.isSupported()`.
+   The result's headline (`#fall-feedback`) is `MoraSegment.fallFeedback`:
+   one sentence naming where the learner's pitch fell vs where it should
+   (the accent IS the fall, and it's what the decoder reads most reliably);
+   the per-mora chips and "N of M matched" stay underneath as detail.
    Also owns attempt playback (`#playback-row`): "⇄ Compare" plays the
    reference then the learner's own take back to back (the comparison, not
    either clip alone, is what tells the learner where their drop landed),
