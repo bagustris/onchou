@@ -9,6 +9,8 @@
 //   jsutPhrase.train / .test  JSUT phrases in continuous speech, same split
 //   ume.A / .B              UME-JRF Set D natives, alternate speakers
 //   ume.learners            UME-JRF Set D learners (agreement with target only)
+//   ltv.train / .test       LaboroTV short phrases, OpenJTalk labels (optional)
+//   jvs.all / .A / .B       JVS, 98 speakers, manual JSUT accents, app-like (optional)
 //
 // Metric: within-mora-count Cohen's kappa of predicted vs target pattern (a
 // constant guess scores 0; see tools/evaluate-decoders.js), with strict,
@@ -77,7 +79,24 @@ function load() {
   const jjSpk = [...new Set(ume.filter((s) => s.group === 'JJ').map((s) => s.speaker))].sort();
   const halfA = new Set(jjSpk.filter((_, i) => i % 2 === 0));
 
+  // LaboroTV short phrases (tools/build-ltv-set.py): many voices, OpenJTalk
+  // labels (noisy), no speaker ids -- clusters are utterances. Optional.
+  const ltvFile = path.join(TMP, 'ltv-traces.json');
+  const ltv = fs.existsSync(ltvFile) ? JSON.parse(fs.readFileSync(ltvFile, 'utf8')).map((s) => ({ ...s, cluster: s.id })) : [];
+
+  // JVS (tools/build-jvs-set.js): 98 professional speakers reading JSUT
+  // basic5000 sentences, jsut-label's manual accents on JVS's alignments,
+  // app-like (first/last phrase with real silence). Held out; optional.
+  const jvsFile = path.join(TMP, 'jvs-applike.json');
+  const jvs = fs.existsSync(jvsFile) ? JSON.parse(fs.readFileSync(jvsFile, 'utf8')).map((s) => ({
+    ...s, accents: [s.accentType], morae: s.moras.map((m) => pseudoKana(m.phones)), cluster: s.speaker,
+  })) : [];
+  const jvsSpk = [...new Set(jvs.map((s) => s.speaker))].sort();
+  const jvsA = new Set(jvsSpk.filter((_, i) => i % 2 === 0));
+
   cache = {
+    jvs: { all: jvs, A: jvs.filter((s) => jvsA.has(s.speaker)), B: jvs.filter((s) => !jvsA.has(s.speaker)) },
+    ltv: { train: ltv.filter((s) => s.split === 'ltv.train'), test: ltv.filter((s) => s.split === 'ltv.test') },
     jsutApp: { train: app.filter((s) => num(s.sentenceId) <= 4000), test: app.filter((s) => num(s.sentenceId) > 4000) },
     jsutPhrase: { train: phrase.filter((s) => num(s.sentenceId) <= 4000), test: phrase.filter((s) => num(s.sentenceId) > 4000) },
     ume: {

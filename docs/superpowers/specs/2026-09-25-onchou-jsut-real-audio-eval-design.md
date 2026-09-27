@@ -905,6 +905,150 @@ lag, they read a late fall as correct.
   handling on this set.
 - The rater study is still what validates transfer to real learner errors.
 
+## Round 7: learned models on isolated words, more voices, fall-first feedback (2026-09-27)
+
+### #5 A learned classifier trained on native isolated words (`tools/paper-exp-augment.js`) -- NOT shipped
+
+The model is multinomial logistic regression per mora count, 190 numbers in
+all, on production slot values (silent morae included), trained on natives
+A only.
+
+| system | natives B κ | learners κ | JSUT app test κ | swap J (B) | flat FA | drift FA | synthetic on-time |
+|---|---|---|---|---|---|---|---|
+| shipped model-free | 0.388 | 0.126 | 0.278 | **39.0** | **7.1%** | **14.6%** | **100%** |
+| LR, natives only | **0.569** | **0.216** | 0.152 | 35.0 | 10.9% | 20.1% | 56% |
+| LR + accent-swap and flat augmentation | 0.156 | 0.065 | 0.057 | 13.6 | 10.8% | 12.0% | 11% |
+| guarded hybrid (shipped guard, LR picks the pattern) | 0.411 | 0.153 | 0.170 | 29.8 | 10.2% | 16.8% | 56% |
+
+- **The natives-only model is the familiar trap.** Trained on native words,
+  it matches natives much better (κ +0.18). But it accepts more
+  accent-removed takes, catches fewer misplaced accents (J 35.0 vs 39.0),
+  and misreads 44% of clean on-time synthetic words. The same happened with
+  the JSUT-trained Gaussians (Round 6).
+- **Augmenting with WORLD accent swaps and flat takes fails.** The model
+  learns the resynthesis rather than the accent: it scores 11% on clean
+  synthetic words, and on words not seen in training it scores κ 0.01.
+- **The flat-rejection threshold (TAU = 0.6) was chosen on natives A.**
+  Speaker-grouped cross-validation, best κ with flat and drift false
+  acceptance no higher than the shipped decoder's.
+- **Verdict: keep the model-free decoder.** A higher κ against native
+  takes isn't evidence of a better tutor; the swap and flat checks are what
+  expose the difference.
+
+### #6 More voices from LaboroTVSpeech with OpenJTalk labels (`tools/build-ltv-set.py`, `tools/ojt-label-noise.py`) -- negative
+
+- **Label quality.** Against jsut-label's manual accents, OpenJTalk's
+  phrase shape agrees for 93% of 2-mora, 85% of 3–4-mora and about 60% of
+  6–7-mora phrases.
+- **The set.** 9,423 short single-phrase TV utterances (2–5 morae,
+  containing a kanji; no interjections). A first pass without the kanji
+  filter was dominated by laughter and onomatopoeia.
+- **Every system is at chance on it:**
+
+  | system | κ |
+  |---|---|
+  | shipped | 0.028 |
+  | shipped without silent morae | 0.033 |
+  | JSUT Gaussians | −0.008 |
+
+- **The pitch doesn't follow the labels.** The median adjacent-slot step is
+  about 0 cents whatever the label. UME natives, by contrast, show −448
+  cents for HL and +213 for LH.
+- **The voiced span isn't just the phrase.** It averages 245 ms per mora
+  against UME's 130, so the TV segments carry music or other speech around
+  the phrase.
+- **Not usable without speech separation and alignment.** LaboroTV also
+  has no speaker ids. JVS (100 clean studio speakers) is the right corpus;
+  see the next section.
+
+### #6 redone with JVS: 98 speakers, manual labels (`tools/build-jvs-set.js`)
+
+JVS's nonpara30 recordings include 3,071 readings of JSUT basic5000
+sentences by its 100 professional speakers. jsut-label's manual accents are
+combined with JVS's automatic phone alignments, which exist for 1,804
+recordings. 429 of those were skipped because the automatic reading differs,
+for example なに vs なん. That leaves 2,750 app-like phrases (first and last
+phrase with real silence) from 98 speakers, all held out. The labels are
+the JSUT speaker's accents, so another speaker may occasionally use a
+different accepted accent.
+
+The labels match the audio: median adjacent-slot steps are −457 cents on
+HLL's second step and +207 on LHH's first. Compare LaboroTV's ≈0.
+
+| system | JVS κ [speaker-bootstrap CI] | strict | unclear |
+|---|---|---|---|
+| original 2-cluster | 0.009 [−0.003, 0.020] | 9.5% | 0.5% |
+| shipped without silent morae | 0.128 [0.111, 0.147] | 28.3% | 8.4% |
+| **shipped** | **0.178** [0.157, 0.200] | 34.5% | 6.6% |
+| JSUT-trained Gaussians (connected speech, lag learned) | 0.316 [0.293, 0.336] | 47.7% | 0.4% |
+
+**Silent morae generalize across speakers** (+0.05).
+
+**The peak delay depends on speaking style, across 98 speakers** (a
+descriptive sweep; nothing was re-tuned):
+
+| delay | 0 | 20 (shipped) | 40 | 60 | 80 | 100 |
+|---|---|---|---|---|---|---|
+| JVS (connected, 98 speakers) | 0.146 | 0.178 | 0.234 | 0.267 | 0.269 | 0.270 |
+| JSUT app-like test (connected, 1 speaker) | 0.226 | 0.278 | 0.342 | 0.365 | 0.378 | 0.377 |
+| UME natives B (isolated words, 16 speakers) | 0.359 | **0.388** | 0.366 | 0.320 | 0.280 | 0.268 |
+
+Connected read speech wants 60–100 ms and isolated words 20 ms, now shown
+on 98 speakers rather than one. The app's input is isolated words, so 20 ms
+stays.
+
+**Best method on JVS (research; learned models allowed).** The metric is
+within-mora-count Cohen's κ with a speaker-bootstrap 95% CI.
+
+JVS reads basic5000 sentences 1–3096, all inside JSUT train. Rows trained on
+JSUT are therefore also given with every JVS sentence removed from training
+("text-disjoint"). The WavLM rows come from `tools/paper-export-jvs.js` and
+`tools/paper-ssl-jvs.py`: WavLM-large layer 8, mean-pooled over the
+production slots, decoding constrained to the valid patterns.
+
+| system | trained on | JVS, all 98 speakers (n≈2,750) | JVS-B, 49 speakers (n≈1,380) |
+|---|---|---|---|
+| model-free, shipped (20 ms) | – | 0.178 [0.157, 0.200] | 0.165 [0.133, 0.199] |
+| model-free, 100 ms delay | – | 0.270 [0.248, 0.296] | 0.258 [0.221, 0.292] |
+| F0-ratio Gaussians | JSUT, text-disjoint | 0.315 [0.291, 0.338] | 0.299 [0.261, 0.335] |
+| F0-ratio Gaussians | JVS-A | (includes training speakers) | 0.249 [0.219, 0.278] |
+| **WavLM-large L8 probe** | **JSUT, text-disjoint** | **0.495 [0.469, 0.520]** | **0.482 [0.437, 0.523]** |
+| WavLM-large L8 probe | JSUT, all (saw the text) | 0.498 [0.474, 0.525] | – |
+| WavLM-large L8 probe | JVS-A | – | 0.476 [0.431, 0.519] |
+| WavLM-large L8 probe | JSUT text-disjoint + JVS-A | – | 0.480 [0.435, 0.522] |
+
+- **Best on JVS: the WavLM probe**, with κ ≈ 0.49 on 98 unseen speakers.
+- **Text overlap doesn't inflate it** (0.498 vs 0.495). Many different
+  sentences give little room for the lexical shortcut, unlike 104 repeated
+  words on UME-JRF.
+- **Training on 49 JVS speakers adds nothing** over one JSUT speaker (0.476
+  vs 0.482).
+- **WavLM was not run on the swap/flat tutor checks for JVS.** On UME-JRF,
+  the learned models trail the model-free decoder there (Rounds 6–7).
+
+### #7 Fall-first feedback (`MoraSegment.fallFeedback`, `js/app.js`) -- SHIPPED
+
+The result's headline is now one sentence about the fall, for example:
+
+- "Your pitch fell after mora 3 「う」 -- it should fall right after mora 2
+  「よ」: move the fall 1 mora earlier." The advice is phrased as an action,
+  because "(1 mora earlier)" was read by a reviewer as describing the
+  learner's fall rather than the target's.
+- "Your pitch didn't fall -- …"
+- "Your pitch fell after … -- this word stays high to the end, with no
+  fall. Keep it level."
+- "Right: your pitch fell after mora 2 「し」."
+
+A take whose fall is right but whose first mora isn't low counts as right,
+with a soft note. Tokyo speakers' initial rise is weak, and absent after a
+heavy syllable. When unclear morae hide the drop's position, the headline
+says so and points to ⇄ Compare. The per-mora chips and "N of M matched"
+stay underneath as detail.
+
+Rationale (Round 6): the decoder names a misplaced fall's exact position
+far more reliably than it gets every mora's level right. A learner acts on
+"move the fall one mora earlier", not on "2 of 4 matched".
+
 ## Conclusions and recommendations
 
 (Rounds 1–2 conclusions, updated by Round 3.)

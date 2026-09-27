@@ -361,5 +361,27 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
   eq('other empty slots stay unclear', MS._decodeAccentPattern([100, null, 150, 150]), ['L', 'unclear', 'H', 'H']);
 }
 
+
+// -- fallFeedback: the headline names where the pitch fell ------------------
+{
+  const { fallFeedback: ff } = require('../mora-segment.js');
+  const v = (l, t, m) => ff(l, t, m).verdict;
+  eq('fall in the right place', v(['L', 'H', 'L'], ['L', 'H', 'L']), 'correct');
+  eq('heiban said level', v(['L', 'H', 'H', 'H'], ['L', 'H', 'H', 'H']), 'correct');
+  eq('fall one mora late', v(['L', 'H', 'H', 'L'], ['L', 'H', 'L', 'L']), 'fall-late');
+  eq('fall one mora early', v(['H', 'L', 'L'], ['L', 'H', 'L']), 'fall-early');
+  eq('no fall where one is due', v(['L', 'H', 'H'], ['L', 'H', 'L']), 'missing-fall');
+  eq('fall on a heiban word', v(['L', 'H', 'L', 'L'], ['L', 'H', 'H', 'H']), 'extra-fall');
+  eq('fall right, first mora not low', v(['H', 'H', 'L'], ['L', 'H', 'L']), 'rise-only');
+  eq('unclear between H and L: position unknown', v(['L', 'H', 'unclear', 'L'], ['L', 'H', 'L', 'L']), 'unclear');
+  eq('unclear before the only L: could have been the high one', v(['L', 'unclear', 'L'], ['L', 'H', 'L']), 'unclear');
+  eq('unclear first mora does not block a judgement', v(['unclear', 'H', 'L'], ['L', 'H', 'L']), 'correct');
+  eq('message names the mora with its kana', ff(['L', 'H', 'H', 'L'], ['L', 'H', 'L', 'L'], ['び', 'よ', 'う', 'い']).message,
+    'Your pitch fell after mora 3 「う」 -- it should fall right after mora 2 「よ」: move the fall 1 mora earlier.');
+  eq('early fall: advice says move it later', ff(['H', 'L', 'L'], ['L', 'H', 'L']).message,
+    'Your pitch fell after mora 1 -- it should fall right after mora 2: move the fall 1 mora later.');
+  eq('particle mode: odaka fall onto が is named', ff(['L', 'H', 'L'], ['L', 'H', 'L'], ['は', 'し', 'が']).message, 'Right: your pitch fell after mora 2 「し」.');
+}
+
 console.log(`mora-segment-test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
