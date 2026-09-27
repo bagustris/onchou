@@ -997,6 +997,35 @@ Connected read speech wants 60–100 ms and isolated words 20 ms, now shown
 on 98 speakers rather than one. The app's input is isolated words, so 20 ms
 stays.
 
+**Best method on JVS (research; learned models allowed).** The metric is
+within-mora-count Cohen's κ with a speaker-bootstrap 95% CI.
+
+JVS reads basic5000 sentences 1–3096, all inside JSUT train. Rows trained on
+JSUT are therefore also given with every JVS sentence removed from training
+("text-disjoint"). The WavLM rows come from `tools/paper-export-jvs.js` and
+`tools/paper-ssl-jvs.py`: WavLM-large layer 8, mean-pooled over the
+production slots, decoding constrained to the valid patterns.
+
+| system | trained on | JVS, all 98 speakers (n≈2,750) | JVS-B, 49 speakers (n≈1,380) |
+|---|---|---|---|
+| model-free, shipped (20 ms) | – | 0.178 [0.157, 0.200] | 0.165 [0.133, 0.199] |
+| model-free, 100 ms delay | – | 0.270 [0.248, 0.296] | 0.258 [0.221, 0.292] |
+| F0-ratio Gaussians | JSUT, text-disjoint | 0.315 [0.291, 0.338] | 0.299 [0.261, 0.335] |
+| F0-ratio Gaussians | JVS-A | (includes training speakers) | 0.249 [0.219, 0.278] |
+| **WavLM-large L8 probe** | **JSUT, text-disjoint** | **0.495 [0.469, 0.520]** | **0.482 [0.437, 0.523]** |
+| WavLM-large L8 probe | JSUT, all (saw the text) | 0.498 [0.474, 0.525] | – |
+| WavLM-large L8 probe | JVS-A | – | 0.476 [0.431, 0.519] |
+| WavLM-large L8 probe | JSUT text-disjoint + JVS-A | – | 0.480 [0.435, 0.522] |
+
+- **Best on JVS: the WavLM probe**, with κ ≈ 0.49 on 98 unseen speakers.
+- **Text overlap doesn't inflate it** (0.498 vs 0.495). Many different
+  sentences give little room for the lexical shortcut, unlike 104 repeated
+  words on UME-JRF.
+- **Training on 49 JVS speakers adds nothing** over one JSUT speaker (0.476
+  vs 0.482).
+- **WavLM was not run on the swap/flat tutor checks for JVS.** On UME-JRF,
+  the learned models trail the model-free decoder there (Rounds 6–7).
+
 ### #7 Fall-first feedback (`MoraSegment.fallFeedback`, `js/app.js`) -- SHIPPED
 
 The result's headline is now one sentence about the fall, for example:
