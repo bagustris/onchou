@@ -245,9 +245,10 @@
   //     needs on a heavy-initial word, whose heiban reading starts high and
   //     declines -- a real atamadaka falls much further inside the syllable.
   //   RISE_WAIVE_VOICELESS_INITIAL: waive the initial-rise requirement when
-  //     mora 1 is a devoicing candidate (i/u after a voiceless consonant,
-  //     before one), where the rise sits on a voiceless mora and can't be
-  //     heard -- the same reasoning as the heavy-syllable waiver.
+  //     mora 1 is a devoicing candidate by the kana rule (i/u after a
+  //     voiceless consonant, before a voiceless onset: ひかく, ふそく -- not
+  //     きやく, whose や is voiced), where the rise sits on a voiceless mora
+  //     and can't be heard -- the same reasoning as the heavy-syllable waiver.
   //   FINAL_DROP_CAP_CENTS: phrase-final lowering; up to this much of a drop
   //     onto the word's last mora is treated as final lowering, not accent.
   var MIN_SPLIT_HEAVY_HEAD_CENTS = 100;

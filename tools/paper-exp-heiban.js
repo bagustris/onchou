@@ -51,7 +51,10 @@ function flatFA(set, fn) {
   }
   return { flat: acc.flat[0] / acc.flat[1], decl: acc.decl[0] / acc.decl[1] };
 }
-const heibanOK = (set, fn) => { const h = set.filter((s) => s.accents[0] === 0 && s.moraCount >= 2 && s.trace.some((f) => f.hz != null)); return h.filter((s) => fn(s).join('') === shapeOf(s.moraCount, 0)).length / h.length; };
+// Single-accent heiban entries only: a word listing heiban among several
+// accepted accents (白檀 [2/0], 銅貨 [1/0], 額 [0/2]) has no unambiguous
+// heiban ground truth.
+const heibanOK = (set, fn) => { const h = set.filter((s) => s.accents.length === 1 && s.accents[0] === 0 && s.moraCount >= 2 && s.trace.some((f) => f.hz != null)); return h.filter((s) => fn(s).join('') === shapeOf(s.moraCount, 0)).length / h.length; };
 const pc = (x) => (100 * x).toFixed(1);
 
 if (!process.env.REPORT) {
@@ -60,7 +63,7 @@ if (!process.env.REPORT) {
   grid.push({ RISE_WAIVE_VOICELESS_INITIAL: true });
   for (const v of [50, 100, 150, 200]) grid.push({ FINAL_DROP_CAP_CENTS: v });
   for (const h of [200, 250]) for (const f of [100, 150]) grid.push({ MIN_SPLIT_HEAVY_HEAD_CENTS: h, FINAL_DROP_CAP_CENTS: f, RISE_WAIVE_VOICELESS_INITIAL: true });
-  console.log('Choosing data only. κ = within-mora-count Cohen\'s kappa; heiban OK = % of native heiban takes accepted;');
+  console.log('Choosing data only. κ = within-mora-count Cohen\'s kappa; heiban OK = % of native takes of single-accent heiban words accepted;');
   console.log('swap J = detection − false alarm (%) on natives-A accent swaps; flat/drift FA = % of accent-removed natives-A takes accepted.\n');
   console.log('| setting | natives A κ | heiban OK | swap J | swap det / FA | flat FA | drift FA | JSUT app train κ |\n|---|---|---|---|---|---|---|---|');
   for (const g of grid) {

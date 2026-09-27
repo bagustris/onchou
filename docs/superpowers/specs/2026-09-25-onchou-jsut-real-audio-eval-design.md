@@ -1055,9 +1055,16 @@ The problem: 36% of native heiban takes on natives A are not accepted
 (`tools/paper-exp-errors.js`), the largest source of false rejections. By
 word, there are three distinct causes:
 
-1. **Voiceless first mora** (ひかく, ふそく, きやく, ひやく). The initial rise sits
-   on a voiceless mora and can't be heard. These takes mostly come back
+1. **A first mora with little voicing.** These takes mostly come back
    all-'unclear', not wrong.
+   - The knob below only reaches words whose first mora is a devoicing
+     candidate by the kana rule (i/u after a voiceless consonant, before a
+     voiceless onset), where the initial rise sits on a voiceless mora and
+     can't be heard. On natives A that's 5 words: the heiban 資格 しかく,
+     不足 ふそく and 比較 ひかく, and the odaka 月 つき and 好き すき.
+   - きやく and ひやく show the same symptom (median slot contours 0, 0, −22 and
+     0, 8, −5). But や has a voiced onset, so they aren't rule candidates and
+     the knob doesn't touch them.
 2. **Heavy first syllable** (つうしん, ゆうしょう, かいちゅう, ぼうし). Natives start
    high and decline (median slot cents re slot 1: 0, −50, −108, −138), and some
    takes are read as atamadaka.
@@ -1071,19 +1078,20 @@ One knob per cause was added to `js/mora-segment.js`, all off by default:
 (`tools/paper-exp-heiban.js`, `tools/tmp/paper-heiban-sweep.txt`).
 
 **Sweep (choosing data).** κ = within-mora-count Cohen's kappa; "heiban OK" =
-% of native heiban takes accepted; swap J = detection − false alarm (%) on
+% of native takes of single-accent heiban words accepted (multi-accent entries
+such as 白檀 [2/0], 銅貨 [1/0] and 額 [0/2] have no unambiguous heiban answer); swap J = detection − false alarm (%) on
 natives-A accent swaps; FA = % of accent-removed takes accepted (accented
 targets).
 
 | setting | natives A κ | heiban OK | swap J | flat FA | drift FA | JSUT app train κ |
 |---|---|---|---|---|---|---|
-| shipped | 0.458 | 64.0 | 52.0 | 4.4 | 13.6 | 0.250 |
-| heavy-head threshold 200 cents | 0.446 | 65.5 | 49.0 | 4.4 | 12.4 | 0.249 |
-| heavy-head threshold 300 cents | 0.398 | 66.3 | 43.9 | 4.4 | 12.1 | 0.246 |
-| voiceless-initial rise waiver | 0.466 | 65.1 | 52.5 | 4.4 | 13.6 | 0.252 |
-| final-drop cap 100 cents | 0.433 | 65.1 | 50.8 | 4.2 | 7.0 | 0.224 |
-| final-drop cap 200 cents | 0.408 | 65.7 | 46.6 | 3.9 | 6.9 | 0.191 |
-| all three (200 / waiver / 100) | 0.416 | 68.1 | 46.8 | 4.2 | 6.7 | 0.226 |
+| shipped | 0.458 | 63.8 | 52.0 | 4.4 | 13.6 | 0.250 |
+| heavy-head threshold 200 cents | 0.446 | 65.3 | 49.0 | 4.4 | 12.4 | 0.249 |
+| heavy-head threshold 300 cents | 0.398 | 66.1 | 43.9 | 4.4 | 12.1 | 0.246 |
+| voiceless-initial rise waiver | 0.466 | 64.9 | 52.5 | 4.4 | 13.6 | 0.252 |
+| final-drop cap 100 cents | 0.433 | 64.9 | 50.8 | 4.2 | 7.0 | 0.224 |
+| final-drop cap 200 cents | 0.408 | 65.5 | 46.6 | 3.9 | 6.9 | 0.191 |
+| all three (200 / waiver / 100) | 0.416 | 68.0 | 46.8 | 4.2 | 6.7 | 0.226 |
 
 **Reading:**
 
@@ -1094,7 +1102,7 @@ targets).
 - **The voiceless-initial waiver is the only setting that improves every
   column above.** But the flat test counts only accented words, and this
   waiver changes what happens to flat takes on the no-fall words it
-  touches. On natives A, for those 5 words:
+  touches. On natives A, for those 5 words (しかく, ふそく, ひかく, つき, すき):
   - native takes accepted: 42% → 59%;
   - flat/drift takes accepted as correct heiban: 24% → 70%.
 
