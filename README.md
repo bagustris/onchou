@@ -7,7 +7,7 @@ convention [kotoba](https://github.com/bagustris/kotoba) and
 accent), lets you hear a reference pronunciation via the browser's built-in
 Japanese TTS voice, then records your own attempt via the microphone,
 extracts its pitch contour client-side, and shows how your per-mora
-high/low pattern compares to the target — no server, no ML model.
+high/low pattern compares to the target.
 
 Plain HTML/CSS/JS, no framework, no build step — designed to run as-is on
 GitHub Pages, matching the shape of its sibling apps
