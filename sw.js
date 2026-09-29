@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'onchou-v24';
+const CACHE_VERSION = 'onchou-v25';
 
 // The whole app shell plus data/words.json are precached -- unlike jed/
 // kotoba (which have large on-demand data/ trees), onchou's entire dataset

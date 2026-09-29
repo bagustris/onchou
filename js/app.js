@@ -589,7 +589,7 @@
       // claim about anything actually measured. The mic recording stops at
       // the word itself, so there's no real detected pitch for whatever
       // comes after it (see
-      // docs/2026-09-05-pitch-accent-evaluation-research-plan.md for the
+      // ASR_JA_Vowel_Devoicing/doc/accent/2026-09-05-pitch-accent-evaluation-research-plan.md for the
       // future-data-collection note this gap motivates, and the
       // particle-mode design spec for the opt-in mode that fills it).
       var trailingLevel = fullTargetLevels[fullTargetLevels.length - 1];

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // synthetic-regression.js -- guards the real-audio-tuned pipeline changes
-// (tools/evaluate-pipeline.js) against regressing on the two synthetic
-// conditions tools/pitch-accuracy-experiment.js established as the app's
+// (ASR_JA_Vowel_Devoicing/accent/tools/evaluate-pipeline.js) against regressing on the two synthetic
+// conditions ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js established as the app's
 // contract:
 //   1. Clean isolated words with a real H/L contrast (and optional
 //      declination) -- must still be recognized. These traces have ZERO
@@ -35,7 +35,7 @@ function gaussian(rng) {
 }
 
 // glideMs: linear pitch glide centered on each mora boundary (0 = abrupt).
-// Added after tools/pitch-accuracy-experiment.js's Stage 2 caught a 50ms
+// Added after ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js's Stage 2 caught a 50ms
 // peak delay dropping to 92% exact on 40ms glides with zero-delay audio --
 // the case this file originally missed.
 function trace(target, hHz, lHz, moraMs, decl, moraJ, frameJ, rng, glideMs) {
