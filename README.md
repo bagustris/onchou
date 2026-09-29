@@ -41,7 +41,8 @@ permission and works best served over `localhost` or HTTPS (browsers
 generally block `getUserMedia` on plain HTTP for any other origin).
 
 There is no build, lint, or type-check command — there's no toolchain to
-run.
+run. For using trained models, the user should check their permission 
+to use the models and ensure they are compatible with their intended use case.  
 
 ## Data
 
