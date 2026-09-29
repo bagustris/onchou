@@ -180,7 +180,7 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
 }
 
 // -- classifyLevels (retired from segmentByMora, still exported for
-// tools/pitch-accuracy-experiment.js): 2-cluster split, direct unit tests --
+// ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js): 2-cluster split, direct unit tests --
 
 {
   // Two well-separated clusters, interleaved order -- split must group by
@@ -206,7 +206,7 @@ eq('decode: fewer than 2 present slots -> unclear', decodeAccentPattern([150, nu
 // -- MIN_SPLIT_CENTS: a 2-cluster split always finds SOME division, even
 // when the "contrast" is too small to trust -- e.g. a flat/monotone
 // attempt where the only variation is noise. Found the same way as the
-// median-tie bug: tools/pitch-accuracy-experiment.js's Stage 5 measured a
+// median-tie bug: ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js's Stage 5 measured a
 // 2-mora word (where the split can only ever be LH or HL, and every 2-mora
 // accent target IS one of those two shapes) as a near coin-flip false
 // "correct" against pure noise before this guard existed. 100 cents was

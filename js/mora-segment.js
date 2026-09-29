@@ -84,7 +84,7 @@
   // no-accent attempt isn't a rare fluke away from an exact match, it's a
   // coin flip.
   //
-  // 100 was picked from tools/pitch-accuracy-experiment.js's Stage 4/5:
+  // 100 was picked from ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js's Stage 4/5:
   // Stage 5 scores a flat/no-contrast synthetic trace against every real
   // target shape (2/3/4 morae, the SAME per-mora + per-frame jitter model
   // Stage 4 uses for genuine contrasts, so this isn't measured against an
@@ -160,7 +160,7 @@
 
   // ---- accent-pattern decoding (replaced classifyLevels in segmentByMora
   // on 2026-09-25 -- see
-  // docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md,
+  // ASR_JA_Vowel_Devoicing/doc/accent/2026-09-25-onchou-jsut-real-audio-eval-design.md,
   // "Literature-derived improvements", for the real-audio evidence) -------
   //
   // Evaluated on real JSUT speech with jsut-label's manual accent labels,
@@ -186,7 +186,7 @@
   //    unit). The right amount depends on speaking STYLE, not rate:
   //    connected read speech (JSUT) wants ~80-100ms, but isolated words
   //    from 33 native speakers (UME-JRF -- onchou's actual input) want
-  //    ~20ms at the SAME per-mora rate (tools/paper-exp-delay*.js). 20ms is
+  //    ~20ms at the SAME per-mora rate (ASR_JA_Vowel_Devoicing/accent/tools/paper-exp-delay*.js). 20ms is
   //    the isolated-word optimum (chosen on half the speakers), and also
   //    keeps clean synthetic zero-delay words -- glides included -- at 100%.
   // 3. Constrained decoding with a joint declination term
@@ -210,7 +210,7 @@
   var VOICE_GATE_DB = 15;
   var PEAK_DELAY_MS = 20;
   // How one value per mora slot is taken: 'median' (shipped), or -- for the
-  // perceptual-cue experiments (tools/paper-exp-cues.js) -- 'late' (median
+  // perceptual-cue experiments (ASR_JA_Vowel_Devoicing/accent/tools/paper-exp-cues.js) -- 'late' (median
   // of the slot's second half) or 'target' (least-squares line through the
   // slot's frames, evaluated at its end; Ishi, Minematsu & Hirose 2001).
   var MORA_VALUE = 'median';
@@ -395,7 +395,7 @@
   // resynthesis, allowing that raised false acceptance of 3-mora atamadaka
   // words like てんき from 6.8% to 8.9%; requiring three keeps it at 7.1%.
   //
-  // Checked against the audio (tools/paper-devoicing*.py): on JSUT, with
+  // Checked against the audio (ASR_JA_Vowel_Devoicing/accent/tools/paper-devoicing*.py): on JSUT, with
   // every i/u vowel labelled by pYIN's voicing over its aligned segment, the
   // rule scores F1 0.84 -- the same as the report's ASR model trained on the
   // rule's labels, and above OpenJTalk's own devoicing (0.82) and above
@@ -661,11 +661,11 @@
   // slots; Ishi, Minematsu & Hirose 2001) per (mora count, pattern),
   // maximum likelihood with equal class priors (it can't favour a pattern
   // just because it's common). 838 numbers, trained on one JSUT speaker's
-  // read speech (tools/build-accent-model.js). Held-out, this guarded
+  // read speech (ASR_JA_Vowel_Devoicing/accent/tools/build-accent-model.js). Held-out, this guarded
   // hybrid matches the model-free decoder on 16 unseen native speakers'
   // isolated words (kappa ~0.35 both) and beats it on connected speech
   // (0.236 -> 0.376), with flat attempts still rejected -- see
-  // docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md.
+  // ASR_JA_Vowel_Devoicing/doc/accent/2026-09-25-onchou-jsut-real-audio-eval-design.md.
   //
   // OPT-IN ONLY (opts.useModel === true), and the app does not load it: the
   // table was learned from connected read speech, where accentual F0 events
@@ -828,7 +828,7 @@
     scorePattern: scorePattern,
     fallFeedback: fallFeedback,
     _median: median, // exposed for testing
-    _classifyLevels: classifyLevels, // retired from segmentByMora; kept for tools/pitch-accuracy-experiment.js and its tests
+    _classifyLevels: classifyLevels, // retired from segmentByMora; kept for ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js and its tests
     _decodeAccentPattern: decodeAccentPattern, // exposed for testing
     _gateQuietFrames: gateQuietFrames, // exposed for testing
     _heavyInitial: heavyInitial, // exposed for testing

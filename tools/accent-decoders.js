@@ -1,6 +1,6 @@
 // accent-decoders.js -- pure, DOM-free candidate replacements for
 // js/mora-segment.js's classifyLevels(), evaluated on real JSUT audio by
-// tools/evaluate-decoders.js. Everything here is model-free (no trained
+// ASR_JA_Vowel_Devoicing/accent/tools/evaluate-decoders.js. Everything here is model-free (no trained
 // weights, no server) so any winner can be ported into the shipped app
 // without breaking its "no ML model, no server" constraint.
 //

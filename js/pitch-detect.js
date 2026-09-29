@@ -136,7 +136,7 @@
   // RMS level of one frame, stored alongside hz in every trace entry.
   // estimatePitch reports pitch on near-silence (random 70-400Hz values
   // 25-58dB below a take's loudest frame, measured on real recordings --
-  // see docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md),
+  // see ASR_JA_Vowel_Devoicing/doc/accent/2026-09-25-onchou-jsut-real-audio-eval-design.md),
   // so mora-segment.js uses this to gate those frames out relative to the
   // take's own peak before cutting mora slots.
   function frameRms(samples) {

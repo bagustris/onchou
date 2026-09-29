@@ -84,7 +84,7 @@ dependency order, each an IIFE-scoped global:
    late), and decodes with `decodeAccentPattern` — valid Tokyo patterns
    only, fit jointly with a bounded declination slope, all-'unclear' below
    `MIN_SPLIT_CENTS` (100). This replaced the 2-cluster `classifyLevels`
-   (kept exported only for `tools/pitch-accuracy-experiment.js`) after it
+   (kept exported only for `ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js`) after it
    measured at chance on real speech — see the 2026-09-25 addendum in the
    design spec. The no-fall shape's initial-rise requirement is waived for
    a heavy SONORANT first syllable (`heavyInitial`: ん, ー, long vowel or
@@ -94,11 +94,11 @@ dependency order, each an IIFE-scoped global:
    are confounded. Silent morae (`SILENT_MORAE`, `silentMorae`): a geminate
    っ and an i/u predicted devoiced by the voiceless-consonant rule (from
    github.com/bagustris/ASR_JA_Vowel_Devoicing, checked against pYIN-labelled
-   JSUT audio in `tools/paper-devoicing.py`) get no F0 value. At the word's
+   JSUT audio in `ASR_JA_Vowel_Devoicing/accent/tools/paper-devoicing.py`) get no F0 value. At the word's
    edges they're left out of the voiced span's slot division, and they take
    the decoded pattern's level instead of 'unclear'. Devoicing is assumed
    only if three morae keep a voice. `js/accent-model.js` (a small learned pattern-choice
-   table, built by `tools/build-accent-model.js`) is OPT-IN only
+   table, built by `ASR_JA_Vowel_Devoicing/accent/tools/build-accent-model.js`) is OPT-IN only
    (`opts.useModel: true`) and is not loaded by `index.html`: it was
    learned from connected read speech and misreads on-time accent steps by
    one mora, and it's derived from research-only JSUT audio. Every constant there
@@ -227,36 +227,27 @@ manual copy rather than a real git submodule, and the README for
 attribution). Runtime code reads only `data/words.json`, built from it by a
 `tools/` script — see the design spec's "Data" section.
 
-### Real-audio pitch-accuracy evaluation (research tooling, not runtime code)
+### Research and training code lives elsewhere
 
-`tools/evaluate-jsut-accuracy.js` (+ `tools/wav-reader.js`,
-`tools/jsut-lab-parser.js`, `tools/jsut-signal-level-check.py`) run the
-shipped `js/pitch-detect.js`/`js/mora-segment.js` pipeline, unmodified,
-against the real JSUT speech corpus and jsut-label's manually-annotated
-accent labels. `tools/build-applike-set.js` builds the "app-like" set
-(phrases with their real surrounding silence); `tools/accent-decoders.js` +
-`tools/evaluate-decoders.js` + `tools/evaluate-pipeline.js` compare decoder
-variants on held-out sentences (4001–5000; tuning only ever sees 1–4000);
-`tools/synthetic-regression.js` is the synthetic guard any change to
-`segmentByMora` must also pass. `tools/build-umejrf-set.js` +
-`tools/evaluate-umejrf.js` test isolated words from 33 native speakers and
-141 learners (UME-JRF Set D, dictionary targets, speaker-bootstrap CIs) --
-the only multi-speaker, isolated-word check. `tools/paper-*.js` /
-`tools/paper-*.py` hold the Interspeech experiments (see
-`docs/paper/2026-09-25-interspeech-plan.md`), including the monotone
-resynthesis test (`paper-flatten.py`), which any change to the decoder's
-evidence guards should be re-checked against. `tools/rating/` is a
-LOCAL-ONLY native-rater tool (UME-JRF audio is research-only: never host or
-publish it). Headline metric is within-mora-count
-Cohen's κ, NOT per-mora accuracy (a no-audio constant guess scores ~66%
-per-mora on this corpus) — see
-`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`
-for the full design, results, and honest scope caveats (this is decision-
-and signal-level validation on one native studio speaker's continuous
-speech, not a learner-recording or perceptual-validation study — see
-`docs/2026-09-05-pitch-accent-evaluation-research-plan.md`, which this
-partially, not fully, closes). Output/caches under `tools/tmp/` are
-reproducible, `.gitignore`d, and never committed.
+This repository is the app only: UI/UX and in-browser inference. All
+real-audio evaluation, corpus builders, paper experiments, learned-model
+training and the native-rater tool live in the sibling repository
+[ASR_JA_Vowel_Devoicing](https://github.com/bagustris/ASR_JA_Vowel_Devoicing)
+under `accent/`. The evaluation design doc (why every decoder constant has its
+value, with all results) is at
+`ASR_JA_Vowel_Devoicing/doc/accent/2026-09-25-onchou-jsut-real-audio-eval-design.md`.
+
+Those tools load this repo's `js/` modules, `tools/accent-decoders.js`,
+`data/` and `vendor/` from a sibling checkout (`ONCHOU_DIR`); nothing here
+imports from there. Two decoder checks stay here, because they test the
+shipped code with no corpus data:
+- the `js/__tests__/` unit tests;
+- `tools/synthetic-regression.js`, which every change to `segmentByMora`
+  must pass (with `tools/accent-decoders.js` for the old-decoder baseline).
+
+Any change to the decoder's constants or evidence guards should also be
+re-checked on real audio with the research repo's harness. The headline
+metric is within-mora-count Cohen's κ, not per-mora accuracy.
 
 ### Shared CSS tokens
 

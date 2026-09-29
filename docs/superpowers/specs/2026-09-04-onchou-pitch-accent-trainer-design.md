@@ -159,7 +159,7 @@ listening aid, not the ground truth.
 
 ### 2026-09-24 addendum: H/L rule changed from a population-median threshold to a 2-cluster split
 
-A synthetic-audio validation experiment (`tools/pitch-accuracy-experiment.js`,
+A synthetic-audio validation experiment (`ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js`,
 run offline, not part of the shipped app) found that the rule above —
 comparing each mora's median Hz to the recording's own overall median — is
 structurally unable to avoid exact ties whenever one H/L class is a
@@ -264,7 +264,7 @@ top of it.
 
 `MIN_SPLIT_CENTS` was tuned entirely against synthetic audio and would
 benefit from recalibration once real recorded takes are available (see the
-"Caveat" below and `docs/2026-09-05-pitch-accent-evaluation-research-plan.md`).
+"Caveat" below and `ASR_JA_Vowel_Devoicing/doc/accent/2026-09-05-pitch-accent-evaluation-research-plan.md`).
 
 **Downstream UI fix required by this same change:** `js/app.js`'s
 `handleTrace` previously showed "Couldn't detect your voice clearly" for any
@@ -287,7 +287,7 @@ logic under known-ground-truth conditions, not real-speech accuracy.
 
 Evaluated on real speech for the first time (JSUT + jsut-label's manual
 accent labels, held-out sentences; full write-up in
-`docs/superpowers/specs/2026-09-25-onchou-jsut-real-audio-eval-design.md`),
+`ASR_JA_Vowel_Devoicing/doc/accent/2026-09-25-onchou-jsut-real-audio-eval-design.md`),
 the 2-cluster `classifyLevels` rule above carried essentially no accent
 information: within-mora-count Cohen's κ 0.004 on continuous phrases and
 −0.04 on words with real silence around them, scoring below a no-audio
@@ -308,11 +308,11 @@ gates the fitted accent step, still reporting a flat attempt all-'unclear'.
 Slots with no voiced frames stay 'unclear'. `segmentByMora` also returns
 `slots` (the exact windows scored), which `js/pitch-contour.js` uses for its
 target step-line. `classifyLevels` is kept exported for
-`tools/pitch-accuracy-experiment.js` but no longer used by the app.
+`ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js` but no longer used by the app.
 
 Held-out result on app-like audio: κ −0.037 → 0.285, strict whole-pattern
 7.3% → 43.8%, per-mora 43.2% → 80.0%; the synthetic contract above is
-preserved (`tools/pitch-accuracy-experiment.js` Stage 2: 100% on every
+preserved (`ASR_JA_Vowel_Devoicing/accent/tools/pitch-accuracy-experiment.js` Stage 2: 100% on every
 pass; `tools/synthetic-regression.js`: strong-contrast words stay at 100%,
 weak contrast under declination 38.9% → 86.5%, flat-attempt false exact
 matches go down except 2-mora/no-declination, 0% → 1.6%). Trade-off

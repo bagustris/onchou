@@ -15,7 +15,7 @@ unmeasured dot (see its comment at the `trailingLevel` line) "purely for
 visual alignment... not a claim about anything actually measured." A learner
 can currently say a heiban and an odaka word identically and score 100% on
 both — the app cannot teach or test the one contrast that actually
-distinguishes them. `docs/2026-09-05-pitch-accent-evaluation-research-plan.md`
+distinguishes them. `ASR_JA_Vowel_Devoicing/doc/accent/2026-09-05-pitch-accent-evaluation-research-plan.md`
 names this the same gap ("no real trailing-particle pitch data").
 
 As a side effect, this also makes every 1-mora word unscoreable today
@@ -154,7 +154,7 @@ has no test file today).
 
 ## Future extension
 
-`docs/2026-09-05-pitch-accent-evaluation-research-plan.md`'s
+`ASR_JA_Vowel_Devoicing/doc/accent/2026-09-05-pitch-accent-evaluation-research-plan.md`'s
 "no real trailing-particle pitch data" gap can now start closing — a learner
 opting into this mode is exactly the source of the labeled particle-pitch
 recordings that plan calls for.
